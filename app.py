@@ -8,18 +8,8 @@ import hashlib
 import requests
 import io
 import os
-import urllib.request
-import ssl
 import google.generativeai as genai
 from fpdf import FPDF
-
-# Mac/일부 윈도우 환경 폰트 다운로드 SSL 에러 방지
-try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
-else:
-    ssl._create_default_https_context = _create_unverified_https_context
 
 # =========================================================================
 # 🔐 [보안 전용 구역] 최종 API 키 매핑
@@ -33,18 +23,15 @@ API_KEYS = {
 # 제미나이 공식 초기화
 genai.configure(api_key=API_KEYS["GEMINI_API"])
 
-# 페이지 레이아웃 설정
+# =========================================================================
+# 🎨 Streamlit 기본 UI (메뉴, 푸터) 숨기기
+# =========================================================================
 st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V31.0")
-import streamlit as st
-
-# 우측 상단 메뉴, 하단 푸터, 사이드바 기본 내비게이션을 숨기는 템플릿
 hide_style = """
     <style>
-    #MainMenu {visibility: hidden;}        /* 우측 상단 메뉴 숨기기 */
-    footer {visibility: hidden; position: relative;}           /* 하단 푸터 숨기기 */
-    header {visibility: hidden;}           /* 상단 헤더 영역 레이아웃 숨기기 */
-    
-    /* 만약 사이드바의 기본 페이지 내비게이션 목록을 숨기고 싶다면 */
+    #MainMenu {visibility: hidden;}        
+    footer {visibility: hidden; position: relative;}           
+    header {visibility: hidden;}           
     [data-testid="stSidebarNav"] {display: none !important;}
     </style>
 """
@@ -95,21 +82,26 @@ def fetch_roboflow_mask(img_bytes, workflow_id, classes_param, w, h):
                 x2, y2 = min(w, int(px + pw/2)), min(h, int(py + ph/2))
                 cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1)
     except Exception as e:
-        st.error(f"⚠️ {workflow_id} 통신 에러: {e}")
+        pass
     return mask
 
+@st.cache_resource
 def get_korean_font():
+    # 서버 환경(Streamlit Cloud)에서 폰트 다운로드 에러를 완벽히 막는 로직
     font_path = "NanumGothic.ttf"
     if not os.path.exists(font_path):
-        url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+        url = "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
         try:
-            urllib.request.urlretrieve(url, font_path)
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(url, headers=headers, timeout=10)
+            with open(font_path, "wb") as f:
+                f.write(response.content)
         except Exception:
             pass
     return font_path
 
 def clean_text_for_pdf(text):
-    """ FPDF에서 인코딩 크래시를 유발하는 이모지 및 특수문자를 안전한 텍스트 기호로 변환 """
+    """ FPDF 인코딩 오류 방지용 특수문자 치환기 """
     replacements = {
         "■": "-", "★": "*", "🏆": "[종합]", "✅": "[적절]", "❌": "[부적절]",
         "①": "1)", "②": "2)", "③": "3)", "④": "4)", "🤖": "[AI]", "🧠": "[AI]",
@@ -131,57 +123,57 @@ def generate_gemini_commentary(page_type, data_summary):
             prompt = f"당신은 비파괴 검사 전문가입니다. 다음 강도 추정 데이터를 바탕으로 '종합 추정 강도 분석 및 학술적 근거' 작성(KS F 2730 이상치 정제 의미, 복합 추정식 차이 분석, SCI 저널 논리 활용):\n{data_summary}"
         
         response = model.generate_content(prompt)
-        final_text = response.text + "\n\n(해당 멘트는 제미나이로 작성되었습니다)"
-        return final_text
+        return response.text + "\n\n(해당 멘트는 제미나이로 작성되었습니다)"
     except Exception as e:
         return f"제미나이 코멘트 생성 중 오류 발생: {str(e)}\n\n(해당 멘트는 제미나이로 작성되었습니다)"
 
+# ==================== PDF 생성기 ====================
 def create_page1_pdf(metadata, img_left_pil, img_right_pil, gemini_comment):
     pdf = FPDF()
     pdf.add_page()
     font_path = get_korean_font()
     if os.path.exists(font_path):
         pdf.add_font("NanumGothic", "", font_path)
-        pdf.set_font("NanumGothic", size=11)
+        pdf.set_font("NanumGothic", size=10)
     else:
-        pdf.set_font("Arial", size=11)
+        pdf.set_font("Arial", size=10)
         
-    # Title
     pdf.set_font("NanumGothic" if os.path.exists(font_path) else "Arial", style="B", size=16)
     pdf.cell(0, 10, clean_text_for_pdf("콘크리트 학습한 ai 기반 슈미트해머 타격지점 추천 보고서"), ln=True, align="C")
     pdf.ln(5)
     
-    # Metadata
+    # HWPX 기획서 기준 메타데이터 작성
     pdf.set_font("NanumGothic" if os.path.exists(font_path) else "Arial", size=10)
     pdf.cell(0, 6, clean_text_for_pdf(f"■ 슈미트 희망 날짜: {metadata.get('date', '-')}"), ln=True)
     pdf.cell(0, 6, clean_text_for_pdf(f"■ 슈미트 타격 물리적 위치: {metadata.get('location', '-')}"), ln=True)
     pdf.cell(0, 6, clean_text_for_pdf(f"■ 희망 타격 횟수: {metadata.get('target_count', '-')} 회"), ln=True)
-    pdf.cell(0, 6, clean_text_for_pdf(f"■ 기상청 실시간 api기반 온도 및 습도: 온도({metadata.get('temp', '-')}도) / 습도({metadata.get('humidity', '-')}%)"), ln=True)
-    pdf.cell(0, 6, clean_text_for_pdf(f"   -> [이에 따른 해당 날짜 및 시간, 장소에 슈미트 헤머 치기 {metadata.get('status', '적절')}합니다.]"), ln=True)
-    pdf.cell(0, 6, clean_text_for_pdf(f"■ 선택 AI: {metadata.get('ai_info', '-')}"), ln=True)
-    pdf.cell(0, 6, clean_text_for_pdf(f"■ 기준점 위치 및 실제 거리: 가로x세로 면적 ({metadata.get('area_cm2', '-')} cm²), 픽셀당 거리는 {metadata.get('pixel_scale_cm', '-')} cm ({metadata.get('pixel_scale_mm', '-')} mm)입니다."), ln=True)
-    pdf.ln(5)
+    pdf.cell(0, 6, clean_text_for_pdf(f"■ 기상청 실시간 API 기반 온도 및 습도: 온도({metadata.get('temp', '-')}도) / 습도({metadata.get('humidity', '-')}%)"), ln=True)
+    pdf.cell(0, 6, clean_text_for_pdf(f"   -> [이에 따른 해당 날짜 및 시간, 장소에 슈미트 해머 치기 {metadata.get('status', '적절')}합니다.]"), ln=True)
     
-    # Images
+    pdf.multi_cell(0, 6, clean_text_for_pdf(f"■ 선택 AI: {metadata.get('ai_status', '-')}"))
+    pdf.multi_cell(0, 5, clean_text_for_pdf(f"■ 선택 AI 연동 사이트 주소:\n{metadata.get('ai_url', '-')}"))
+    
+    pdf.cell(0, 6, clean_text_for_pdf(f"■ 기준점 분석: 기준점에 근거한 사진 찍은 벽면의 실제 가로x세로는 ({metadata.get('area_cm2', '-')} cm²) 이며 픽셀당 거리는 {metadata.get('pixel_scale_cm', '-')} cm 입니다."), ln=True)
+    pdf.ln(3)
+    
+    # 이미지 첨부 영역
     pdf.cell(0, 6, clean_text_for_pdf("■ 선택한 2사진 매핑 분석 결과 (좌: 신뢰도 맵 / 우: 3cm 이격 타격지점 원 마스킹)"), ln=True)
-    
     if img_left_pil is not None and img_right_pil is not None:
         buf_l, buf_r = io.BytesIO(), io.BytesIO()
         img_left_pil.save(buf_l, format="PNG")
         img_right_pil.save(buf_r, format="PNG")
-        buf_l.seek(0)
-        buf_r.seek(0)
+        buf_l.seek(0); buf_r.seek(0)
         
         current_y = pdf.get_y()
         pdf.image(buf_l, x=10, y=current_y, w=90)
         pdf.image(buf_r, x=105, y=current_y, w=90)
         pdf.set_y(current_y + 75)
     else:
-        pdf.cell(0, 10, clean_text_for_pdf("[이미지 처리 오류: 사진을 불러올 수 없습니다]"), ln=True)
+        pdf.cell(0, 10, clean_text_for_pdf("[이미지 오류: 사진 미첨부]"), ln=True)
     
     pdf.ln(5)
     
-    # Gemini Commentary
+    # 제미나이 의견
     pdf.set_font("NanumGothic" if os.path.exists(font_path) else "Arial", style="B", size=12)
     pdf.cell(0, 8, clean_text_for_pdf("■ AI 및 빅데이터 연동 분석 근거 및 추측근거"), ln=True)
     pdf.set_font("NanumGothic" if os.path.exists(font_path) else "Arial", size=9)
@@ -205,7 +197,7 @@ def create_page2_pdf(data, gemini_comment):
     
     pdf.set_font("NanumGothic" if os.path.exists(font_path) else "Arial", size=10)
     pdf.cell(0, 6, clean_text_for_pdf(f"■ 일시 및 장소: {data.get('date', '-')} / {data.get('location', '-')}"), ln=True)
-    pdf.cell(0, 6, clean_text_for_pdf(f"■ 환경 조건: 온도 {data.get('temp', '-')}도, 습도 {data.get('humidity', '-')} % -> [{data.get('status', '적절')}]"), ln=True)
+    pdf.cell(0, 6, clean_text_for_pdf(f"■ 기상청 실시간 환경 조건: 온도 {data.get('temp', '-')}도, 습도 {data.get('humidity', '-')} % -> [{data.get('status', '적절')}]"), ln=True)
     pdf.cell(0, 6, clean_text_for_pdf(f"■ 콘크리트 사양: 타설일 {data.get('pour_date', '-')} (현재 기준 {data.get('age_days', '-')}일 경과), 설계기준강도: {data.get('design_strength', '-')} MPa"), ln=True)
     pdf.multi_cell(0, 5, clean_text_for_pdf(f"■ 현장 원시 반발도 데이터(R):\n{data.get('raw_values', '-')}"))
     pdf.ln(3)
@@ -214,7 +206,7 @@ def create_page2_pdf(data, gemini_comment):
     pdf.cell(0, 7, clean_text_for_pdf("■ KS F 2730 규격 처리 및 계산 결과"), ln=True)
     pdf.set_font("NanumGothic" if os.path.exists(font_path) else "Arial", size=10)
     pdf.cell(0, 6, clean_text_for_pdf(f" - 전체 반발도 평균: {data.get('total_avg', '-')} R / 보정 반발도 평균: {data.get('filtered_avg', '-')} R"), ln=True)
-    pdf.cell(0, 6, clean_text_for_pdf(f" - [통계 데이터 필터링]: 전체 평균의 +-10% 범위를 벗어난 이상치 총 {data.get('deleted_count', '0')}개 자동 폐기"), ln=True)
+    pdf.cell(0, 6, clean_text_for_pdf(f" - [통계 데이터 필터링]: 전체 평균의 +-10% 범위를 벗어난 이상치 총 {data.get('deleted_count', '0')}개 자동 폐기됨"), ln=True)
     pdf.cell(0, 6, clean_text_for_pdf(f" - ① 보정 반발도에 따른 강도(단독): {data.get('rebound_strength', '-')} MPa"), ln=True)
     pdf.cell(0, 6, clean_text_for_pdf(f" - ② 초음파 강도 (속도: {data.get('ultrasonic','-')} m/s): {data.get('ultrasonic_strength', '-')} MPa"), ln=True)
     pdf.cell(0, 6, clean_text_for_pdf(f" - ③ 슬럼프 강도 (치수: {data.get('slump','-')} mm): {data.get('slump_strength', '-')} MPa"), ln=True)
@@ -300,7 +292,6 @@ if "1." in main_menu:
 
     uploaded_file = st.file_uploader("📸 벽면 사진 업로드", type=["jpg", "png"])
 
-    # 변수 초기화 (에러 원천 차단)
     weather_map_pil = None
     strike_map_pil = None
     final_selected_count = 0
@@ -336,7 +327,7 @@ if "1." in main_menu:
         calculated_area_cm2 = int(((w * mm_per_pixel) / 10.0) * ((h * mm_per_pixel) / 10.0))
         
         if mm_per_pixel > 0:
-            st.success(f"📊 **기준점 기반 면적 분석 완료:** 사진 찍은 벽면의 실제 가로x세로 크기는 `{calculated_area_cm2:,} cm²` 이며, 픽셀당 거리는 `{p_scale_cm:.4f} cm` (`{p_scale_mm:.4f} mm`) 입니다.")
+            st.success(f"📊 **기준점 기반 면적 분석 완료:** 기준점에 근거한 사진 찍은 벽면의 실제 가로x세로는 `{calculated_area_cm2:,} cm²` 이며 픽셀당 거리는 `{p_scale_cm:.4f} cm` 입니다.")
 
         px_1cm_rad = int(10 / mm_per_pixel / 2) if mm_per_pixel > 0 else 10
         px_2cm = int(20 / mm_per_pixel) if mm_per_pixel > 0 else 40
@@ -422,10 +413,10 @@ if "1." in main_menu:
 
         col_res1, col_res2 = st.columns(2)
         with col_res1:
-            st.markdown("#### 1️⃣ AI 다중 앙상블 신뢰도 지도")
+            st.markdown("#### 1️⃣ AI 다중 앙상블 신뢰도 지도 (맵핑)")
             st.image(weather_map_pil, use_container_width=True)
         with col_res2:
-            st.markdown("#### 2️⃣ 시방서 기반 AI 최적 타격 좌표 (지름 1cm 원, 3cm 간격 확보)")
+            st.markdown("#### 2️⃣ 시방서 기반 AI 최적 타격 좌표 (지름 1cm 원, 3cm 이격 적용)")
             st.image(strike_map_pil, use_container_width=True)
 
         is_usable = final_selected_count >= desired_strikes
@@ -443,8 +434,30 @@ if "1." in main_menu:
         if weather_map_pil is not None and strike_map_pil is not None:
             if st.button("🚀 1페이지 제미나이 연동 PDF 리포트 생성"):
                 with st.spinner("Gemini AI가 표준시방서 및 학술 논문을 기반으로 분석 리포트를 작성 중입니다..."):
-                    ai_list_str = f"균열/철근노출탐지 AI ({'O' if use_model1 else 'X'}), 요철/불균질면 탐지 AI ({'O' if use_model2 else 'X'}), 범용 콘크리트 결함 AI ({'O' if use_model3 else 'X'})"
-                    p1_summary = f"장소: {m_loc} / 희망타격: {desired_strikes}회 / 기상: 온도 {auto_temp}도, 습도 {auto_hum}% / 모델: {ai_list_str} / 픽셀당 {p_scale_cm:.4f}cm / 가로x세로 실제면적: {calculated_area_cm2}cm2 / 3cm 이격 기준 매핑 적용"
+                    # AI 현황 문자열 구성 (기획서 요청 사항)
+                    ai_stats = []
+                    ai_urls = []
+                    if use_model1:
+                        ai_stats.append("균열/철근노출탐지 AI (O)")
+                        ai_urls.append("- 균열탐지: https://universe.roboflow.com/defect-detection-0atjo/concrete-defect-detection-zuym8")
+                    else: ai_stats.append("균열/철근노출탐지 AI (X)")
+                    
+                    if use_model2:
+                        ai_stats.append("요철/불균질면 탐지 AI (O)")
+                        ai_urls.append("- 요철탐지: https://universe.roboflow.com/shm/concrete-defect-detection")
+                    else: ai_stats.append("요철/불균질면 탐지 AI (X)")
+                    
+                    if use_model3:
+                        ai_stats.append("범용 콘크리트 결함 AI (O)")
+                        ai_urls.append("- 범용결함: https://universe.roboflow.com/concrete-defects/concrete-defects-irdui")
+                    else: ai_stats.append("범용 콘크리트 결함 AI (X)")
+                    
+                    ai_stats.append("네이버/아마존/구글/자체 AI (추후 연동 예정, 작동하지 않았음)")
+                    
+                    ai_info_str = " , ".join(ai_stats)
+                    ai_url_str = "\n".join(ai_urls)
+                    
+                    p1_summary = f"장소: {m_loc} / 희망타격: {desired_strikes}회 / 기상: 온도 {auto_temp}도, 습도 {auto_hum}% / 모델: {ai_info_str} / 픽셀당 {p_scale_cm:.4f}cm / 3cm 이격 기준 매핑 적용"
                     gemini_text = generate_gemini_commentary(1, p1_summary)
                     
                     st.markdown("### 🤖 제미나이 실시간 분석 의견 요약")
@@ -457,8 +470,8 @@ if "1." in main_menu:
                         'temp': auto_temp, 
                         'humidity': auto_hum, 
                         'status': '적절' if is_weather_valid else '부적절',
-                        'ai_info': ai_list_str, 
-                        'pixel_scale_mm': f"{p_scale_mm:.4f}",
+                        'ai_status': ai_info_str,
+                        'ai_url': ai_url_str,
                         'pixel_scale_cm': f"{p_scale_cm:.4f}",
                         'area_cm2': f"{calculated_area_cm2:,}"
                     }
@@ -509,11 +522,11 @@ elif "2." in main_menu:
     ks_avg = np.mean(filtered_data) if filtered_data else total_avg
     ex_count = len(excluded_indices)
 
-    # ① 보정 반발도에 따른 단독 추정 강도 연산
+    # ① 보정 반발도 단독 추정 강도 연산
     fc_rebound = max(0.0, 1.3 * ks_avg - 14.0)
     age_factor = max(0.82, 1.0 - 0.03 * math.log(total_days / 28.0)) if total_days > 28 else 1.0
 
-    # ② 초음파 및 ③ 슬럼프 개별 강도 보정치 산출
+    # ② 초음파 및 ③ 슬럼프 강도 연산
     fc_ultra_only = (0.0028 * (ks_avg ** 1.2) * ((val_ultra/1000.0) ** 2.3)) * age_factor if use_ultra else 0
     slump_corr = max(0.80, 1.0 - 0.0008 * (val_slump - 150)) if (use_slump and val_slump>150) else 1.0
     fc_slump_only = fc_rebound * age_factor * slump_corr if use_slump else 0
@@ -523,13 +536,13 @@ elif "2." in main_menu:
     if auto_hum2 >= 80.0: env_factor *= 1.06 
     if auto_temp2 < 5.0 or auto_temp2 > 35.0: env_factor *= 0.93 
     
-    # ④ 종합 하이브리드 추정 강도 계산 
+    # ④ 종합 추정 강도 계산 
     base_hybrid = fc_rebound
     if use_ultra: base_hybrid = (0.0032 * (ks_avg ** 1.25) * ((val_ultra/1000.0) ** 2.1)) * age_factor
     if use_slump and val_slump > 150: base_hybrid *= max(0.85, 1.0 - 0.0007 * (val_slump - 150))
     fc_final_hybrid = base_hybrid * env_factor
     
-    # 📈 화면 데이터 출력 (유저가 복구 요청한 강도 전용 지표 구역)
+    # 📈 화면 데이터 출력부 복구 (강도 지표 표시)
     st.write("---")
     st.markdown("### 📈 데이터 보정 및 개별/종합 복합 추정 결과")
     
@@ -540,7 +553,7 @@ elif "2." in main_menu:
     st.markdown("#### 🔍 연산 항목별 세부 추정 강도 분석")
     col_fc1, col_fc2, col_fc3 = st.columns(3)
     with col_fc1:
-        st.metric("① 보정 반발도에 따른 강도 (단독)", f"{fc_rebound:.1f} MPa")
+        st.metric("① 보정 반발도에 따른 강도(단독)", f"{fc_rebound:.1f} MPa")
     with col_fc2:
         st.metric("② 초음파 복합 강도", f"{fc_ultra_only:.1f} MPa" if use_ultra else "미연동")
     with col_fc3:
@@ -550,7 +563,7 @@ elif "2." in main_menu:
     st.info(f"🏆 **[④ 종합 추정 강도]:** 모든 물리적 조건 및 다중 센서 융합 최종 예측 강도는 **`{fc_final_hybrid:.1f} MPa`** 입니다. (설계기준강도 {fck} MPa 대비 {fc_final_hybrid/fck*100:.1f}% 수준)")
     st.caption("최종 6차원 하이브리드 융합식: $Final\\ F_c = [Base\\ Hybrid(R, V, Slump) \\times Age\\_Factor] \\times Env\\_Factor$")
     
-    # 📚 근거 및 출처 마크다운 구역 복구
+    # 📚 근거 및 출처 구역 복구
     st.write("---")
     with st.expander("📚 출처 및 자료 신뢰성 증빙 (클릭 시 펼쳐집니다)", expanded=True):
         st.markdown("""

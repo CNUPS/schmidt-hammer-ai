@@ -6,3 +6,4 @@ numpy
 fpdf2
 google-generativeai
 requests
+reportlab

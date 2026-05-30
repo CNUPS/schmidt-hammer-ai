@@ -35,6 +35,20 @@ genai.configure(api_key=API_KEYS["GEMINI_API"])
 
 # 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V31.0")
+import streamlit as st
+
+# 우측 상단 메뉴, 하단 푸터, 사이드바 기본 내비게이션을 숨기는 템플릿
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}        /* 우측 상단 메뉴 숨기기 */
+    footer {visibility: hidden; position: relative;}           /* 하단 푸터 숨기기 */
+    header {visibility: hidden;}           /* 상단 헤더 영역 레이아웃 숨기기 */
+    
+    /* 만약 사이드바의 기본 페이지 내비게이션 목록을 숨기고 싶다면 */
+    [data-testid="stSidebarNav"] {display: none !important;}
+    </style>
+"""
+st.markdown(hide_style, unsafe_allow_html=True)
 
 # =========================================================================
 # 🛠️ 유틸리티 및 AI / PDF 연동 함수 모음

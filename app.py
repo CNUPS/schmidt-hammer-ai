@@ -12,14 +12,15 @@ import google.generativeai as genai
 # =========================================================================
 # 🔐 API 키 설정 구역
 # =========================================================================
-# 보안 권장 방식:
+# 방법 1. Streamlit Cloud Secrets 사용 권장
 # Streamlit Cloud > App settings > Secrets 에 아래처럼 등록
 #
 # ROBOFLOW_API = "교수님_ROBOFLOW_API_KEY"
 # KMA_WEATHER = "교수님_KMA_WEATHER_KEY"
 # GEMINI_API = "교수님_GEMINI_API_KEY"
 #
-# 또는 급하게 테스트할 경우 아래 fallback "" 안에 직접 입력 가능
+# 방법 2. 급하게 테스트할 경우 아래 "" 안에 직접 입력
+# 단, 공개 저장소에는 절대 API 키를 올리지 않는 것을 권장
 
 API_KEYS = {
     "ROBOFLOW_API": st.secrets.get("ROBOFLOW_API", ""),
@@ -34,7 +35,7 @@ if API_KEYS["GEMINI_API"]:
 # =========================================================================
 # 🎨 Streamlit 기본 UI 숨기기
 # =========================================================================
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V32.0")
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V32.1")
 
 hide_style = """
     <style>
@@ -185,8 +186,14 @@ def generate_gemini_commentary(page_type, data_summary):
     return generate_static_engineering_commentary(page_type, data_summary)
 
 
-def make_time_options_30min():
-    return [f"{h:02d}:{m:02d}" for h in range(24) for m in [0, 30]]
+def make_time_options_korean():
+    return [f"{h:02d}시 {m:02d}분" for h in range(24) for m in [0, 30]]
+
+
+def parse_korean_time(time_text):
+    hour = int(time_text.split("시")[0])
+    minute = int(time_text.split("시")[1].replace("분", "").strip())
+    return hour, minute
 
 
 # =========================================================================
@@ -207,7 +214,7 @@ main_menu = st.sidebar.radio(
 # 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천
 # =========================================================================
 if "1." in main_menu:
-    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V32.0)")
+    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V32.1)")
 
     st.subheader("📋 측정 환경 및 스캔 설정")
 
@@ -217,9 +224,9 @@ if "1." in main_menu:
         m_date = st.date_input("슈미트해머 측정 예정/실시 날짜", datetime.date.today())
 
     with c_hdr2:
-        time_options = make_time_options_30min()
-        selected_time = st.selectbox("측정 시간", time_options, index=time_options.index("14:00"))
-        m_hour, m_min = map(int, selected_time.split(":"))
+        time_options = make_time_options_korean()
+        selected_time = st.selectbox("측정 시간", time_options, index=time_options.index("14시 00분"))
+        m_hour, m_min = parse_korean_time(selected_time)
 
     with c_hdr3:
         m_loc = st.text_input("측정 장소 (시/구)", value="대전광역시 유성구")
@@ -243,13 +250,22 @@ if "1." in main_menu:
     c_api1, c_api2, c_api3 = st.columns(3)
 
     use_model1 = c_api1.checkbox("균열/철근노출 탐지 AI (API-9)", value=True)
-    c_api1.caption("🔗 출처: Roboflow Universe 모델 1")
+    c_api1.markdown(
+        "🔗 출처: [Roboflow Universe - Concrete Defect Detection 1]"
+        "(https://universe.roboflow.com/defect-detection-0atjo/concrete-defect-detection-zuym8)"
+    )
 
     use_model2 = c_api2.checkbox("요철/불균질면 탐지 AI (API-10)", value=True)
-    c_api2.caption("🔗 출처: Roboflow Universe 모델 2")
+    c_api2.markdown(
+        "🔗 출처: [Roboflow Universe - Concrete Defect Detection 2]"
+        "(https://universe.roboflow.com/shm/concrete-defect-detection)"
+    )
 
     use_model3 = c_api3.checkbox("범용 콘크리트 결함 AI (API-11)", value=True)
-    c_api3.caption("🔗 출처: Roboflow Universe 모델 3")
+    c_api3.markdown(
+        "🔗 출처: [Roboflow Universe - Concrete Defects]"
+        "(https://universe.roboflow.com/concrete-defects/concrete-defects-irdui)"
+    )
 
     st.write("")
 
@@ -581,14 +597,15 @@ elif "2." in main_menu:
 
         m2_date = st.date_input("슈미트해머 실시 날짜", datetime.date.today())
 
-        m2_hour = st.selectbox("시", list(range(24)), index=10)
-        m2_min = st.selectbox("분", [0, 15, 30, 45], index=0)
+        time_options2 = make_time_options_korean()
+        selected_time2 = st.selectbox("측정 시간", time_options2, index=time_options2.index("10시 00분"))
+        m2_hour, m2_min = parse_korean_time(selected_time2)
 
         m2_loc = st.text_input("위치", value="현장 A측면")
 
         auto_temp2, auto_hum2 = fetch_kma_weather_simulated(m2_date, m2_hour, m2_min, m2_loc)
 
-        st.warning(f"📡 [기상청] 온도: {auto_temp2} ℃ / 습도: {auto_hum2} %")
+        st.warning(f"📡 [기상청] {m2_date} {selected_time2} 기준 / 온도: {auto_temp2} ℃ / 습도: {auto_hum2} %")
 
         is_weather2_valid = evaluate_ks_weather(auto_temp2, auto_hum2)[0]
 
@@ -732,6 +749,7 @@ elif "2." in main_menu:
     if st.button("🚀 2페이지 Gemini AI 분석 코멘트 생성"):
         with st.spinner("Gemini AI가 KS F 2730 기준 및 복합추정식을 기반으로 분석 중입니다..."):
             p2_summary = (
+                f"측정 일시: {m2_date} {selected_time2} / "
                 f"현장 원시값: {raw_inputs} / "
                 f"전체평균: {total_avg:.2f} / "
                 f"이상치 10% 폐기: {ex_count}개 / "

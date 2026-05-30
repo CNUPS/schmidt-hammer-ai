@@ -1,5 +1,8 @@
 streamlit
 ultralytics
 opencv-python-headless
-pillow
+Pillow
 numpy
+fpdf2
+google-generativeai
+requests

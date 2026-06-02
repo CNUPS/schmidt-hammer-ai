@@ -1,8 +1,6 @@
-streamlit
-ultralytics
-opencv-python-headless
-Pillow
-numpy
-fpdf2
-google-generativeai
-requests
+streamlit==1.32.2
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+Pillow==10.2.0
+requests==2.31.0
+google-generativeai==0.4.1

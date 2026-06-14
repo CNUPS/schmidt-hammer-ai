@@ -11,7 +11,8 @@ import google.generativeai as genai
 # =========================================================================
 # 🎨 1. Streamlit 설정 (항상 최상단에 위치)
 # =========================================================================
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V35.0 (KRISS 표준)")
+# initial_sidebar_state="expanded" 를 추가하여 메뉴가 항상 열려있도록 보장합니다.
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V35.0 (KRISS 표준)", initial_sidebar_state="expanded")
 
 # UI 숨기기 (사이드바 버튼이 사라지지 않도록 가장 안전한 설정만 남김)
 hide_style = """

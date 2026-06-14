@@ -11,10 +11,9 @@ import google.generativeai as genai
 # =========================================================================
 # 🎨 1. Streamlit 설정 (항상 최상단에 위치)
 # =========================================================================
-# initial_sidebar_state="expanded" 를 추가하여 메뉴가 항상 열려있도록 보장합니다.
 st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V35.0 (KRISS 표준)", initial_sidebar_state="expanded")
 
-# UI 숨기기 (사이드바 메뉴가 사라지지 않도록 가장 안전한 설정만 남김)
+# UI 숨기기 (사이드바 버튼이 사라지지 않도록 가장 안전한 설정만 남김)
 hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -371,7 +370,6 @@ if "1." in main_menu:
 
         st.markdown("#### 🧾 AI 표면 신뢰도 판정 요약")
         st.info(f"**분석 대상 면적:** `{real_width_cm:.1f} cm × {real_height_cm:.1f} cm = {calculated_area_cm2:,.1f} cm²`  \n**픽셀 환산 계수:** `1 pixel = {p_scale_cm:.4f} cm`  \n**AI 결함 의심 비율:** `{defect_ratio:.2f} %`  \n**확보된 후보 타격점:** `{final_selected_count}개` / 요청 `{desired_strikes}개`  \n**종합 신뢰도 등급:** `{reliability_grade}`  \n\n{reliability_msg}")
-        st.caption("※ 녹색 표시는 우선 타격 추천점, 주황색 표시는 예비 타격점입니다. 결함 의심 영역, 이미지 외곽부, 타격점 간 간섭 가능 구역은 자동으로 회피하도록 설정되어 있습니다.")
 
         st.write("---")
         st.subheader("🤖 Gemini AI 구조 분석 요약")

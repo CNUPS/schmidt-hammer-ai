@@ -4,4 +4,3 @@ numpy
 Pillow
 requests
 google-generativeai
-

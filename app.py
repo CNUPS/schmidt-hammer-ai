@@ -23,7 +23,7 @@ if API_KEYS["GEMINI_API"]:
 # =========================================================================
 # 🎨 Streamlit 기본 UI 숨기기
 # =========================================================================
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V34.0 (Final)")
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V35.0 (KRISS 표준)")
 
 hide_style = """
     <style>
@@ -120,7 +120,7 @@ def generate_gemini_commentary(page_type, data_summary):
 당신은 콘크리트 비파괴검사 전문가입니다.
 아래 강도 추정 데이터를 바탕으로 종합 분석 의견을 작성하세요.
 작성 조건:
-- 한국어, KS F 2730 이상치 정제 의미 및 복합법 연동 설명 (5~7문장)
+- 한국어, KS F 2730 이상치 정제 의미 및 KRISS 국가표준 복합법 연동 설명 (5~7문장)
 현장 데이터:
 {data_summary}
 """
@@ -172,10 +172,10 @@ main_menu = st.sidebar.radio(
 )
 
 # =========================================================================
-# 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천 (원본 100% 유지)
+# 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천
 # =========================================================================
 if "1." in main_menu:
-    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V34.0)")
+    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V35.0)")
 
     st.subheader("📋 측정 환경 및 스캔 설정")
     c_hdr1, c_hdr2, c_hdr3, c_hdr4 = st.columns(4)
@@ -383,10 +383,10 @@ if "1." in main_menu:
                 st.info(gemini_text)
 
 # =========================================================================
-# 2페이지: SCI급 다중 센서 및 환경 변수 복합 강도 연산 시스템 (업그레이드 완벽 병합)
+# 2페이지: 다중 센서 및 환경 변수 복합 강도 연산 시스템 (국가표준 완벽 병합)
 # =========================================================================
 elif "2." in main_menu:
-    st.title("📊 SCI급 다중 센서 및 환경 변수 복합 강도 연산 시스템")
+    st.title("📊 국가표준(KRISS) 기반 다중 센서/환경 융합 강도 연산 시스템")
 
     col_env, col_data = st.columns([1, 1])
 
@@ -413,10 +413,10 @@ elif "2." in main_menu:
         if use_ultra:
             c_u1, c_u2 = st.columns(2)
             with c_u1:
-                dist_val = st.number_input("📏 프로브 간 측정 거리", min_value=1.0, value=200.0)
+                dist_val = st.number_input("📏 프로브 간 측정 거리", min_value=1.0, value=300.0)
                 dist_unit = st.selectbox("거리 단위", ["mm", "cm", "m"], index=0)
             with c_u2:
-                time_val = st.number_input("⏱️ 초음파 주행 시간(Transit Time)", min_value=0.1, value=51.2)
+                time_val = st.number_input("⏱️ 초음파 주행 시간(Transit Time)", min_value=0.1, value=73.5)
                 time_unit = st.selectbox("시간 단위", ["μs", "ms", "s"], index=0)
             hz_spec = st.selectbox("📡 센서 주파수 대역 (학술 보고용)", ["54 kHz (토목/콘크리트 표준)", "150 kHz (정밀/소형)", "24 kHz (대형 구조물)"])
         else:
@@ -438,7 +438,7 @@ elif "2." in main_menu:
 
         st.caption(f"선택된 각도: {angle_val}° (KS F 2730 규격에 따른 중력 가속도 연속 보간식이 자동 적용됩니다.)")
 
-        raw_inputs = [st.number_input(f"{i}번째 R값", value=39.0 if i != 5 else 22.0, key=f"r_{i}") for i in range(1, strike_count + 1)]
+        raw_inputs = [st.number_input(f"{i}번째 R값", value=36.0 if i != 5 else 22.0, key=f"r_{i}") for i in range(1, strike_count + 1)]
 
     # =========================================================================
     # ⚙️ 데이터 분석 연산 구역
@@ -473,19 +473,25 @@ elif "2." in main_menu:
     else:
         v_mps, v_kmps, l_m, t_s = 0, 0, 0, 0
 
-    # 5. 복합 연산 (SonReb) 및 단일 강도
-    fc_ultra_only = (0.0028 * (corrected_R ** 1.25) * (v_kmps ** 2.3)) * age_factor if (use_ultra and v_kmps > 0) else 0
+    # 5. 복합 연산 (한국표준과학연구원 KRISS 복합법 적용)
+    # 대한민국 실정에 맞는 국가 공인 다중회귀식으로 완벽 교체
+    if use_ultra and v_kmps > 0:
+        fc_ultra_only = max(0.0, (1.52 * corrected_R + 16.87 * v_kmps - 66.9) * age_factor)
+    else:
+        fc_ultra_only = 0
+
     fc_slump_only = fc_rebound * age_factor * slump_corr if use_slump else 0
 
     # 종합 최종 강도
     if use_ultra and v_kmps > 0:
-        base_hybrid = (0.0032 * (corrected_R ** 1.25) * (v_kmps ** 2.1)) * age_factor
+        base_hybrid = (1.52 * corrected_R + 16.87 * v_kmps - 66.9) * age_factor
     else:
         base_hybrid = fc_rebound * age_factor
     
     if use_slump and val_slump > 150:
         base_hybrid *= max(0.85, 1.0 - 0.0007 * (val_slump - 150))
-    fc_final_hybrid = base_hybrid * env_factor
+        
+    fc_final_hybrid = max(0.0, base_hybrid * env_factor)
 
     # =========================================================================
     # 📈 화면 출력 (기존 + LaTeX 추가)
@@ -524,8 +530,8 @@ elif "2." in main_menu:
 
     with c_lx2:
         if use_ultra:
-            st.caption("✔️ **[해외 SCI / 학회 논문] 다중 회귀 복합식 (SonReb)**")
-            st.latex(r"F_c = \left[ 0.0032 \cdot R_0^{1.25} \cdot V_{(km/s)}^{2.1} \right] \times f_{age} \times f_{env} \times f_{slump}")
+            st.caption("✔️ **[한국표준과학연구원/국토안전관리원] 다중 회귀 복합식**")
+            st.latex(r"F_c = \left[ 1.52 \cdot R_0 + 16.87 \cdot V_{(km/s)} - 66.9 \right] \times f_{age} \times f_{env} \times f_{slump}")
         else:
             st.caption("✔️ **[대한건축학회] 단일 반발도 추정 선형식**")
             st.latex(r"F_c = \left[ 1.3 \cdot R_0 - 14.0 \right] \times f_{age} \times f_{env} \times f_{slump}")
@@ -540,8 +546,8 @@ elif "2." in main_menu:
   * 단위 무관 초음파 도달 시간과 거리의 $m/s$ 표준 환산 적용.
 * **[국내 표준 시방서] 국토교통부 KCS 국가건설기준 (`KCS 14 20 00`)**
   * 표면 결함 회피 영역 이격 조건 및 기상 조건에 따른 환경 허용 한계치 보정.
-* **[해외 SCI 논문] 국제 콘크리트 복합 비파괴 연구 (SonReb)**
-  * R. Jones (2014), "Combined Non-Destructive Testing Methods...": 초음파 속도와 슈미트해머 반발도의 승수형 결합 상관식 차용.
+* **[국가 공인 지침] 국토안전관리원 및 한국표준과학연구원(KRISS)**
+  * 대한민국 골재 및 시멘트 특성에 최적화된 국가 공인 복합 다중회귀식(반발도+초음파속도) 적용.
 * **[국내 학술 논문] 대한건축학회 및 한국구조물유지관리학회 연구**
   * 슬럼프 유동성에 따른 미세 공극률 변화율 및 장기 재령 콘크리트 보정계수 모델 차용.
 """)
@@ -550,6 +556,6 @@ elif "2." in main_menu:
     st.subheader("🤖 Gemini AI 구조 분석 요약")
     if st.button("🚀 2페이지 Gemini AI 분석 코멘트 생성"):
         with st.spinner("Gemini AI가 KS F 2730 기준 및 복합추정식을 기반으로 분석 중입니다..."):
-            p2_summary = f"측정 일시/장소: {m2_date} {m2_loc} / 전체평균: {total_avg:.2f} / 이상치 폐기: {ex_count}개 / 보정평균: {ks_avg:.2f} / 각도 {angle_val}도 적용 최종 반발도: {corrected_R:.2f} / 초음파속도: {v_mps:.1f} m/s / 재령: {total_days}일 / 슬럼프: {val_slump} mm / 융합추정강도: {fc_final_hybrid:.1f} MPa"
+            p2_summary = f"측정 일시/장소: {m2_date} {m2_loc} / 전체평균: {total_avg:.2f} / 이상치 폐기: {ex_count}개 / 보정평균: {ks_avg:.2f} / 각도 {angle_val}도 적용 최종 반발도: {corrected_R:.2f} / 초음파속도: {v_mps:.1f} m/s / 재령: {total_days}일 / 슬럼프: {val_slump} mm / 국가표준 융합추정강도: {fc_final_hybrid:.1f} MPa"
             gemini_text2 = generate_gemini_commentary(2, p2_summary)
             st.info(gemini_text2)

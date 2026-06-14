@@ -11,10 +11,43 @@ import os
 import io
 
 # =========================================================================
-# 🔤 PDF 생성 및 폰트 설정 (ReportLab)
+# 🎨 1. Streamlit 기본 UI 설정 (무조건 가장 먼저 실행되어야 함!)
+# =========================================================================
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V38.0", initial_sidebar_state="expanded")
+
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden; position: relative;}
+    
+    /* 사이드바 접기 버튼 완전 숨김 -> 항상 열려있게 고정 */
+    [data-testid="collapsedControl"] {display: none !important;}
+    
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    </style>
+"""
+st.markdown(hide_style, unsafe_allow_html=True)
+
+# =========================================================================
+# 🔐 2. API 키 설정 구역
+# =========================================================================
+API_KEYS = {
+    "ROBOFLOW_API": st.secrets.get("ROBOFLOW_API", ""),
+    "KMA_WEATHER": st.secrets.get("KMA_WEATHER", ""),
+    "GEMINI_API": st.secrets.get("GEMINI_API", ""),
+}
+
+if API_KEYS["GEMINI_API"]:
+    genai.configure(api_key=API_KEYS["GEMINI_API"])
+
+# =========================================================================
+# 🔤 3. PDF 생성 및 폰트 설정 (ReportLab)
 # =========================================================================
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
@@ -78,11 +111,11 @@ def create_page1_pdf(data):
     story.append(Paragraph(cal_text, body_style))
     story.append(Spacer(1, 8))
     
-    # [버그 해결!] OpenCV 이미지를 PDF 포맷으로 안전하게 변환
     def cv2_to_rl(img_cv, w, h):
         if img_cv is None: return Paragraph("[이미지 없음]", table_text)
         is_success, buf = cv2.imencode(".jpg", img_cv)
         if not is_success: return Paragraph("[이미지 오류]", table_text)
+        from reportlab.platypus import Image as RLImage
         return RLImage(io.BytesIO(buf.tobytes()), width=w, height=h)
         
     img_row1 = [Paragraph("<b>[선택 사진 1: AI 불균질 검출망]</b>", table_text), Paragraph("<b>[선택 사진 2: 최종 추천 타격점]</b>", table_text)]
@@ -176,38 +209,6 @@ def create_page2_pdf(data):
     buffer.seek(0)
     return buffer
 
-# =========================================================================
-# 🔐 API 키 설정 구역
-# =========================================================================
-API_KEYS = {
-    "ROBOFLOW_API": st.secrets.get("ROBOFLOW_API", ""),
-    "KMA_WEATHER": st.secrets.get("KMA_WEATHER", ""),
-    "GEMINI_API": st.secrets.get("GEMINI_API", ""),
-}
-
-if API_KEYS["GEMINI_API"]:
-    genai.configure(api_key=API_KEYS["GEMINI_API"])
-
-# =========================================================================
-# 🎨 Streamlit 기본 UI 설정 (사이드바 방해 요소 100% 제거)
-# =========================================================================
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V38.0", initial_sidebar_state="expanded")
-
-hide_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden; position: relative;}
-    
-    /* 사이드바 접기 버튼 완전 숨김 -> 항상 열려있게 고정 */
-    [data-testid="collapsedControl"] {display: none !important;}
-    
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    </style>
-"""
-st.markdown(hide_style, unsafe_allow_html=True)
 
 # =========================================================================
 # 🛠️ 유틸리티 함수

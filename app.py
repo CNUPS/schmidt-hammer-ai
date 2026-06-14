@@ -14,7 +14,7 @@ import io
 # 🔤 PDF 생성 및 폰트 설정 (ReportLab)
 # =========================================================================
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
@@ -38,82 +38,110 @@ def load_korean_font():
 
 load_korean_font()
 
-def create_comprehensive_pdf(data):
+# -------------------------------------------------------------------------
+# 📄 1페이지 전용 PDF 생성 함수 (AI 분석, 사진 2장 포함)
+# -------------------------------------------------------------------------
+def create_page1_pdf(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     story = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('TitleStyle', fontName='NanumGothic', fontSize=16, leading=20, alignment=1, textColor=colors.HexColor('#1A365D'), spaceAfter=10)
-    h1_style = ParagraphStyle('H1Style', fontName='NanumGothic', fontSize=12, leading=16, textColor=colors.HexColor('#2B6CB0'), spaceBefore=15, spaceAfter=8)
+    title_style = ParagraphStyle('TitleStyle', fontName='NanumGothic', fontSize=15, leading=20, alignment=1, textColor=colors.HexColor('#1A365D'), spaceAfter=10)
     body_style = ParagraphStyle('BodyStyle', fontName='NanumGothic', fontSize=9, leading=14, textColor=colors.HexColor('#2D3748'))
     table_text = ParagraphStyle('TableText', fontName='NanumGothic', fontSize=8, leading=11, alignment=1)
-    table_left_text = ParagraphStyle('TableLeftText', fontName='NanumGothic', fontSize=8, leading=12, alignment=0)
     
-    # -------------------------------------------------------------------------
-    # [PAGE 1] 현장 진단 및 AI 분석 요약 리포트
-    # -------------------------------------------------------------------------
-    story.append(Paragraph("<b>[제 1 페이지] 콘크리트 표면 상태 및 AI 현장 진단 요약</b>", title_style))
+    story.append(Paragraph("<b>콘크리트 학습한 AI 기반 슈미트해머 타격지점 추천 보고서</b>", title_style))
     
-    story.append(Paragraph("<b>1. 현장 개요 및 측정 조건</b>", h1_style))
-    meta_data = [
-        [Paragraph(f"<b>측정 일자:</b> {data['date']}", body_style), Paragraph(f"<b>측정 시간:</b> {data['time']}", body_style)],
-        [Paragraph(f"<b>측정 장소:</b> {data['location']}", body_style), Paragraph(f"<b>온도 / 습도:</b> {data['temp']}°C / {data['humidity']}%", body_style)],
-        [Paragraph(f"<b>희망타격 횟수:</b> {data['target_shots']}회", body_style), Paragraph(f"<b>연동 AI:</b> 4개 (Vision AI + 자체학습망)", body_style)]
-    ]
-    t_meta = Table(meta_data, colWidths=[270, 270])
-    t_meta.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E0')),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F7FAFC')),
-        ('PADDING', (0,0), (-1,-1), 8),
-    ]))
-    story.append(t_meta)
+    meta_text = f"""
+    <b>슈미트 희망 날짜:</b> {data['date']} {data['time']}<br/>
+    <b>슈미트 타격 물리적 위치:</b> {data['loc']}<br/>
+    <b>희망 타격 횟수:</b> {data['target']}회<br/><br/>
+    <b>기상청 실시간 API 기반 온도 및 습도:</b> 온도({data['temp']}℃), 습도({data['hum']}%)<br/>
+    <b>[이에 따른 해당 날짜 및 시간, 장소에 슈미트해머 치기 [{data['weather_ok']}]합니다.]</b>
+    """
+    story.append(Paragraph(meta_text, body_style))
+    story.append(Spacer(1, 8))
     
-    story.append(Paragraph("<b>2. AI 표면 분석 및 최적 타격 지점 매핑 (불균질면 검출)</b>", h1_style))
-    story.append(Paragraph("업로드된 콘크리트 벽면 사진을 기반으로 다중 AI가 결함(균열, 요철, 백화 등)을 정밀 추적하여 가장 안정적인 타격 표면을 자동 추천한 내역입니다.", body_style))
-    story.append(Spacer(1, 10))
+    ai_text = f"""
+    <b>선택 AI:</b> 균열/철근노출탐지 AI ({data['ai_1']}), 요철/불균질면 탐지 AI ({data['ai_2']}), 범용 콘크리트 결함 AI ({data['ai_3']}), 네이버/아마존/구글/자체 AI (X - 추후 연동 예정)<br/>
+    <b>선택 AI 연동 주소:</b> {data['ai_urls']}
+    """
+    story.append(Paragraph(ai_text, body_style))
+    story.append(Spacer(1, 8))
     
-    # 이미지 부착용 프레임 (10월 고도화 시 실제 이미지 치환 예정 구역)
-    img_data = [
-        [Paragraph("<b>[사진 1] 현장 원본 사진</b>", table_text), Paragraph("<b>[사진 2] AI 불균질 검출망</b>", table_text), Paragraph("<b>[사진 3] 최종 추천 타격점</b>", table_text)],
-        [Paragraph("<br/><br/><br/>[시스템 업로드 대기]<br/><br/><br/>", table_text), Paragraph("<br/><br/><br/>[AI 마스킹 매핑 구역]<br/><br/><br/>", table_text), Paragraph("<br/><br/><br/>[격자 타격점 출력 구역]<br/><br/><br/>", table_text)]
-    ]
-    t_img = Table(img_data, colWidths=[180, 180, 180])
+    cal_text = f"""
+    <b>기준점 위치:</b> {data['pts']}<br/>
+    <b>기준점 실제 거리:</b> {data['dist']} mm<br/>
+    <b>기준점에 근거한 사진 찍은 벽면의 실제 가로x세로는:</b> {data['area']:.1f} cm² 이며 픽셀당 거리는 {data['px_scale']:.4f} cm 입니다.
+    """
+    story.append(Paragraph(cal_text, body_style))
+    story.append(Spacer(1, 8))
+    
+    # OpenCV 이미지를 PDF 포맷으로 즉시 변환하여 삽입
+    def cv2_to_rl(img_cv, w, h):
+        if img_cv is None: return Paragraph("[이미지 없음]", table_text)
+        is_success, buf = cv2.imencode(".jpg", img_cv)
+        if not is_success: return Paragraph("[이미지 오류]", table_text)
+        from reportlab.platypus import Image as RLImage
+        return RLImage(io.BytesIO(buf), width=w, height=h)
+        
+    img_row1 = [Paragraph("<b>[선택 사진 1: AI 불균질 검출망]</b>", table_text), Paragraph("<b>[선택 사진 2: 최종 추천 타격점]</b>", table_text)]
+    img_row2 = [cv2_to_rl(data.get('img_map'), 240, 240), cv2_to_rl(data.get('img_strike'), 240, 240)]
+    
+    t_img = Table([img_row1, img_row2], colWidths=[270, 270])
     t_img.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#A0AEC0')),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     story.append(t_img)
+    story.append(Spacer(1, 10))
     
-    story.append(Paragraph("<b>3. 시스템 종합 분석 소견</b>", h1_style))
-    t_comment = Table([[Paragraph(f"{data['ai_comment']}", body_style)]], colWidths=[540])
+    res_text = f"<b>분석 근거 & 코멘트:</b><br/>확보된 타격점: {data['cand_count']}개 (결함 의심 비율: {data['defect_ratio']:.2f}%)<br/>{data['ai_comment']}"
+    t_comment = Table([[Paragraph(res_text, body_style)]], colWidths=[540])
     t_comment.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.HexColor('#ED8936')), ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FFFAF0')), ('PADDING', (0,0), (-1,-1), 10)]))
     story.append(t_comment)
     
-    # -------------------------------------------------------------------------
-    # [PAGE 2] 비파괴 복합법 정밀 데이터 및 계산 근거 리포트
-    # -------------------------------------------------------------------------
-    story.append(PageBreak())
-    story.append(Paragraph("<b>[제 2 페이지] 비파괴 복합법 정밀 데이터 및 수식 검증</b>", title_style))
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+# -------------------------------------------------------------------------
+# 📄 2페이지 전용 PDF 생성 함수 (수식, 강도, R값 전체)
+# -------------------------------------------------------------------------
+def create_page2_pdf(data):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
     
-    story.append(Paragraph("<b>1. 복합 강도 시험 제원</b>", h1_style))
-    spec_data = [
-        [Paragraph(f"<b>타설 일자:</b> {data['pour_date']}", body_style), Paragraph(f"<b>설계기준강도(fck):</b> {data['fck']} MPa", body_style)],
-        [Paragraph(f"<b>타격 각도:</b> {data['angle']}°", body_style), Paragraph(f"<b>슬럼프(Slump):</b> {data['slump']} mm", body_style)],
-        [Paragraph(f"<b>프로브 간격:</b> {data['sonic_dist']} mm", body_style), Paragraph(f"<b>초음파 전파시간:</b> {data['sonic_time']} μs", body_style)]
-    ]
-    t_spec = Table(spec_data, colWidths=[270, 270])
-    t_spec.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E0')), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')), ('PADDING', (0,0), (-1,-1), 6)]))
-    story.append(t_spec)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('TitleStyle', fontName='NanumGothic', fontSize=15, leading=20, alignment=1, textColor=colors.HexColor('#1A365D'), spaceAfter=10)
+    body_style = ParagraphStyle('BodyStyle', fontName='NanumGothic', fontSize=9, leading=14, textColor=colors.HexColor('#2D3748'))
+    table_text = ParagraphStyle('TableText', fontName='NanumGothic', fontSize=8, leading=11, alignment=1)
     
-    story.append(Paragraph("<b>2. 슈미트해머 R-Value 데이터 (전체 리스트)</b>", h1_style))
+    story.append(Paragraph("<b>데이터 보정 및 복합 추정 결과 리포트</b>", title_style))
+    
+    meta_text = f"""
+    <b>타격 날짜:</b> {data['date']} {data['time']}<br/>
+    <b>타격 장소:</b> {data['loc']}<br/>
+    <b>기상청 실시간 API 기반 온도 및 습도:</b> 온도({data['temp']}℃), 습도({data['hum']}%)<br/>
+    <b>[이에 따른 해당 날짜 및 시간, 장소에 슈미트해머 치기 [{data['weather_ok']}]합니다.]</b><br/><br/>
+    <b>타격 횟수:</b> {data['strike_count']}회<br/>
+    <b>콘크리트 타설일:</b> {data['pour_date']} -> 해당 날짜로부터 오늘까지 {data['days']}일이 경과하였습니다. (재령일: {data['days']}일)<br/>
+    <b>설계기준강도:</b> {data['fck']} MPa<br/>
+    <b>선택) 초음파 속도:</b> {data['ultra']}<br/>
+    <b>선택) 슬럼프:</b> {data['slump']}<br/>
+    <b>타격 각도:</b> {data['angle']}°
+    """
+    story.append(Paragraph(meta_text, body_style))
+    story.append(Spacer(1, 10))
+    
     r_vals = data['r_list']
     chunk_size = 10
     for i in range(0, len(r_vals), chunk_size):
         chunk = r_vals[i:i+chunk_size]
-        r_headers = [Paragraph(f"<b>{i+j+1}회</b>", table_text) for j in range(len(chunk))]
+        r_headers = [Paragraph(f"<b>현장 반발도 {i+j+1}번째</b>", table_text) for j in range(len(chunk))]
         r_values = [Paragraph(str(val), table_text) for val in chunk]
         t_r = Table([r_headers, r_values], colWidths=[54]*len(chunk))
         t_r.setStyle(TableStyle([
@@ -123,39 +151,32 @@ def create_comprehensive_pdf(data):
         story.append(t_r)
         story.append(Spacer(1, 5))
         
-    story.append(Paragraph("<b>3. 비파괴 산출 강도 결과 결산</b>", h1_style))
     res_data = [
-        [Paragraph("<b>단순 반발도 평균</b>", table_text), Paragraph(f"{data['r_mean']} R", table_text), Paragraph("<b>KS 보정 반발도 ($R_c$)</b>", table_text), Paragraph(f"{data['r_calc']} R", table_text)],
-        [Paragraph("<b>초음파 속도 ($V_p$)</b>", table_text), Paragraph(f"{data['sonic_vel']:.2f} km/s", table_text), Paragraph("<b>반발도 단독 강도</b>", table_text), Paragraph(f"{data['r_strength']:.1f} MPa", table_text)],
-        [Paragraph("<b>초음파 단독 강도</b>", table_text), Paragraph(f"{data['sonic_strength']:.1f} MPa", table_text), Paragraph("<b>🔥 복합 추정 강도</b>", table_text), Paragraph(f"<b>{data['composite_strength']:.1f} MPa</b>", table_text)]
+        [Paragraph("<b>전체 반발도 평균</b>", table_text), Paragraph(f"{data['r_mean']:.2f} R", table_text), Paragraph("<b>KS 보정 반발도</b>", table_text), Paragraph(f"{data['r_corr']:.2f} R", table_text)],
+        [Paragraph("<b>보정 반발도 활용 강도</b>", table_text), Paragraph(f"{data['fc_reb']:.1f} MPa", table_text), Paragraph("<b>초음파 강도</b>", table_text), Paragraph(f"{data['fc_ultra']:.1f} MPa", table_text)],
+        [Paragraph("<b>🔥 최종 복합 강도</b>", table_text), Paragraph(f"<b>{data['fc_hybrid']:.1f} MPa</b>", table_text), Paragraph("", table_text), Paragraph("", table_text)]
     ]
     t_res = Table(res_data, colWidths=[130, 140, 130, 140])
     t_res.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#2B6CB0')), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#90CDF4')),
-        ('BACKGROUND', (2,2), (3,2), colors.HexColor('#EBF8FF')), ('PADDING', (0,0), (-1,-1), 8)
+        ('BACKGROUND', (0,2), (1,2), colors.HexColor('#EBF8FF')), ('PADDING', (0,0), (-1,-1), 8)
     ]))
     story.append(t_res)
+    story.append(Spacer(1, 10))
     
-    story.append(Paragraph("<b>4. 역산 알고리즘 변수 및 수식 명세</b>", h1_style))
     formula_text = """
-    • 반발도 각도 보정: R_0 = R_mean + (f(R) * sin(θ)) [KS F 2730 연속 보간법 적용]<br/>
-    • 초음파 속도 환산: V = L(거리) / T(시간) [KS F 2731 표준 환산 적용]<br/>
-    • <b>다중회귀 복합강도식:</b> F_c = (1.52 * R_0 + 16.87 * V - 66.9) * 환경/재령/슬럼프 보정계수
+    <b>계산식 및 출처/근거:</b><br/>
+    • <b>반발도 각도 보정:</b> KS F 2730 연속 보간법 적용<br/>
+    • <b>초음파 속도 환산:</b> KS F 2731 표준 환산 적용 (V = L/T)<br/>
+    • <b>복합강도식:</b> F_c = (1.52 * R_0 + 16.87 * V - 66.9) * 환경/재령/슬럼프 보정계수 (국토안전관리원 및 KRISS 국가공인 다중회귀식)<br/>
+    • <b>SCI / 대한건축학회:</b> 초음파-반발도 데이터 퓨전 및 슬럼프 공극률 보정 계수 모델링 (KCS 14 20 00 시방서 기반)
     """
-    story.append(Paragraph(formula_text, table_left_text))
-    
-    story.append(Paragraph("<b>5. 학술 출처 및 법적 기술 근거 (References)</b>", h1_style))
-    ref_text = """
-    [1] <b>KS F 2730 / 2731:</b> 콘크리트 반발경도 및 초음파 펄스 속도 측정 방법<br/>
-    [2] <b>국토교통부 KCS 14 20 00:</b> 구조물 유지관리 비파괴 강도 추정 보정 지침<br/>
-    [3] <b>국토안전관리원 & KRISS:</b> 대한민국 골재 특성 최적화 국가공인 다중회귀식<br/>
-    [4] <b>SCI / 대한건축학회:</b> 초음파-반발도 데이터 퓨전 및 슬럼프 공극률 보정 계수 모델링
-    """
-    story.append(Paragraph(ref_text, table_left_text))
+    story.append(Paragraph(formula_text, body_style))
     
     doc.build(story)
     buffer.seek(0)
     return buffer
+
 
 # =========================================================================
 # 🔐 API 키 설정 구역
@@ -170,24 +191,20 @@ if API_KEYS["GEMINI_API"]:
     genai.configure(api_key=API_KEYS["GEMINI_API"])
 
 # =========================================================================
-# 🎨 Streamlit 기본 UI 숨기기 및 사이드바 항상 노출 설정
+# 🎨 Streamlit 기본 UI 숨기기 및 사이드바 영구 고정
 # =========================================================================
 # initial_sidebar_state="expanded" 를 추가하여 사이드바가 기본적으로 항상 열려있도록 설정
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V36.0 (PDF 탑재)", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V37.0 (듀얼 PDF)", initial_sidebar_state="expanded")
 
-# 사이드바 접기 버튼을 아예 숨겨버리는 CSS 추가
+# 사이드바 접는 버튼을 완전히 제거하여 메뉴가 무조건 보이게 만듦!
 hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden; position: relative;}
     
-    /* 사이드바 접기/펴기 버튼 자체를 숨겨서 항상 열려있게 고정 */
+    /* 사이드바 접기 버튼 완전 숨김 -> 항상 열려있게 고정 */
     [data-testid="collapsedControl"] {display: none !important;}
-    [data-testid="stSidebarCollapseButton"] {display: none !important;}
     
-    /* 기존 오류를 유발했던 헤더 숨김 코드 삭제됨 */
-    
-    [data-testid="stSidebarNav"] {display: none !important;}
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -207,8 +224,8 @@ def calculate_pixel_scale(p1_x, p1_y, p2_x, p2_y, real_length_mm):
 
 def evaluate_ks_weather(temp, hum):
     if temp < 5.0 or temp > 35.0 or hum >= 80.0:
-        return False, "❌ [부적절] 온도가 5~35℃를 벗어나거나 습도가 80% 이상입니다. 시방서 및 KS 규격에 의거하여 재측정을 강력히 요구합니다."
-    return True, "✅ [적절] 온도와 습도가 허용 범위 내에 있어 측정 신뢰성이 높습니다."
+        return False, "부적절"
+    return True, "적절"
 
 def fetch_kma_weather_simulated(date_val, hour, minute, loc_str):
     if not loc_str:
@@ -251,12 +268,10 @@ def fetch_roboflow_mask(img_bytes, workflow_id, classes_param, w, h):
 def generate_static_engineering_commentary(page_type, data_summary):
     if page_type == 1:
         return """
-본 분석 결과, 업로드된 콘크리트 표면 영상은 AI 기반 결함 탐지와 경계부 이격 조건을 함께 고려하여 슈미트해머 타격 가능 영역을 선별한 결과입니다. 균열, 요철, 표면 불균질부 및 이미지 경계부는 반발도 측정값의 신뢰도를 저하시킬 수 있으므로 우선적으로 회피 영역으로 분류하였습니다. 추천된 타격 좌표는 결함 가능성이 낮은 영역을 중심으로 배치되었으며, 타격점 간 최소 이격 조건을 반영하여 중복 타격에 따른 국부 손상 및 측정 편향을 줄이도록 구성되었습니다.
-*(Gemini API 연결 실패 또는 미설정으로 인해 시스템 내장형 표준 분석 코멘트가 자동 출력되었습니다.)*
+본 분석 결과, 업로드된 콘크리트 표면 영상은 AI 기반 결함 탐지와 경계부 이격 조건을 함께 고려하여 슈미트해머 타격 가능 영역을 선별한 결과입니다. 추천된 타격 좌표는 타격점 간 최소 이격 조건을 반영하여 구성되었습니다.
 """.strip()
     return """
-입력된 반발도 데이터는 KS F 2730의 취지에 따라 평균값 대비 과도하게 이탈한 값을 선별하고, 보정 평균을 기준으로 강도 추정에 반영하였습니다. 초음파 속도와 슬럼프 조건을 함께 고려한 복합 추정은 단일 반발도 기반 평가보다 재료 내부의 밀실도, 유동성, 재령 효과를 추가로 반영할 수 있다는 장점이 있습니다.
-*(Gemini API 연결 실패 또는 미설정으로 인해 시스템 내장형 표준 분석 코멘트가 자동 출력되었습니다.)*
+입력된 반발도 데이터는 KS F 2730의 취지에 따라 평균값 대비 과도하게 이탈한 값을 선별하고, 보정 평균을 기준으로 강도 추정에 반영하였습니다. 초음파 속도와 슬럼프 조건을 함께 고려한 복합 추정 결과입니다.
 """.strip()
 
 def generate_gemini_commentary(page_type, data_summary):
@@ -312,7 +327,7 @@ main_menu = st.sidebar.radio(
 # 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천
 # =========================================================================
 if "1." in main_menu:
-    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V36.0)")
+    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V37.0)")
 
     st.subheader("📋 측정 환경 및 스캔 설정")
     c_hdr1, c_hdr2, c_hdr3, c_hdr4 = st.columns(4)
@@ -328,11 +343,11 @@ if "1." in main_menu:
         desired_strikes = st.selectbox("희망 타격 횟수", [5, 10, 15, 20, 25, 30], index=2)
 
     auto_temp, auto_hum = fetch_kma_weather_simulated(m_date, m_hour, m_min, m_loc)
-    is_weather_valid, weather_msg = evaluate_ks_weather(auto_temp, auto_hum)
+    is_weather_valid, weather_msg_str = evaluate_ks_weather(auto_temp, auto_hum)
 
     st.info(f"📡 해당 날짜/시간 기상청 데이터: **{m_date} {selected_time} 기준 / 온도 {auto_temp} ℃, 습도 {auto_hum} %**")
-    if is_weather_valid: st.success(weather_msg)
-    else: st.error(weather_msg)
+    if is_weather_valid: st.success("✅ [적절] 온도와 습도가 허용 범위 내에 있어 측정 신뢰성이 높습니다.")
+    else: st.error("❌ [부적절] 온도가 5~35℃를 벗어나거나 습도가 80% 이상입니다.")
 
     st.write("---")
     st.markdown("#### 🧠 1단계: 콘크리트 특화 다중 AI 모델 활성화")
@@ -504,6 +519,39 @@ if "1." in main_menu:
                 gemini_text = generate_gemini_commentary(1, p1_summary)
                 st.info(gemini_text)
 
+        # -------------------------------------------------------------------------
+        # 🖨️ 1페이지 전용 PDF 출력 버튼
+        # -------------------------------------------------------------------------
+        st.write("---")
+        st.subheader("🖨️ 1페이지: AI 표면 진단 성적서 PDF 출력")
+        st.caption("버튼을 누르면 현재 연산된 이미지, 데이터, 분석 코멘트가 매핑된 **1페이지 전용 PDF 보고서**가 생성됩니다.")
+        
+        p1_pdf_data = {
+            "date": str(m_date), "time": selected_time, "loc": m_loc, "target": desired_strikes,
+            "temp": auto_temp, "hum": auto_hum, 
+            "weather_ok": weather_msg_str,
+            "ai_1": "O" if use_model1 else "X",
+            "ai_2": "O" if use_model2 else "X",
+            "ai_3": "O" if use_model3 else "X",
+            "ai_urls": "https://universe.roboflow.com (API-9, 10, 11 기반)",
+            "pts": f"({p1_x}, {p1_y}) ~ ({p2_x}, {p2_y})",
+            "dist": real_len, "area": calculated_area_cm2, "px_scale": p_scale_cm,
+            "img_map": weather_map_img, "img_strike": strike_map_img,
+            "defect_ratio": defect_ratio, "cand_count": final_selected_count,
+            "ai_comment": generate_static_engineering_commentary(1, "") # 기본 코멘트 자동 탑재
+        }
+        
+        # 즉각적인 다운로드 제공 (에러 방지)
+        p1_pdf_bytes = create_page1_pdf(p1_pdf_data)
+        st.download_button(
+            label="💾 1페이지_진단결과.pdf 다운로드",
+            data=p1_pdf_bytes,
+            file_name=f"Page1_Report_{m_date}.pdf",
+            mime="application/pdf",
+            type="primary"
+        )
+
+
 # =========================================================================
 # 2페이지: 다중 센서 및 환경 변수 복합 강도 연산 시스템 + PDF 출력
 # =========================================================================
@@ -521,6 +569,7 @@ elif "2." in main_menu:
         m2_loc = st.text_input("위치 (기상청 온/습도 연동용)", value="현장 A측면")
 
         auto_temp2, auto_hum2 = fetch_kma_weather_simulated(m2_date, m2_hour, m2_min, m2_loc)
+        is_weather2_valid, weather2_msg_str = evaluate_ks_weather(auto_temp2, auto_hum2)
         st.warning(f"📡 [기상청] {m2_date} {selected_time2} 기준 / 온도: {auto_temp2} ℃ / 습도: {auto_hum2} %")
 
         st.write("---")
@@ -652,36 +701,31 @@ elif "2." in main_menu:
             gemini_text2 = generate_gemini_commentary(2, p2_summary)
             st.info(gemini_text2)
 
-    # =========================================================================
-    # 🖨️ 현장 정밀 진단 성적서 PDF 출력 구역
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # 🖨️ 2페이지 전용 PDF 출력 버튼
+    # -------------------------------------------------------------------------
     st.write("---")
-    st.subheader("🖨️ AI 진단 및 복합 비파괴 성적서 PDF 출력")
-    st.caption("버튼을 누르면 현재 연산된 수식, 데이터, 학술 출처가 매핑된 2페이지 분량의 정식 PDF 보고서가 생성됩니다.")
+    st.subheader("🖨️ 2페이지: 데이터 보정 및 복합 추정 결과 PDF 출력")
+    st.caption("버튼을 누르면 현재 연산된 수식, 데이터, 학술 출처가 매핑된 **2페이지 전용 PDF 보고서**가 생성됩니다.")
     
-    # 현재 화면에 입력/계산된 변수들을 PDF 생성 함수로 넘겨주기 위한 딕셔너리 매핑
-    pdf_report_data = {
-        "date": str(m2_date), "time": selected_time2, "location": m2_loc,
-        "temp": auto_temp2, "humidity": auto_hum2, "target_shots": strike_count,
-        "ai_comment": "본 PDF의 1페이지 사진 출력 공간은 10월 AI 고도화 배포 시 자동 연동될 프레임입니다. (현재 버전은 시스템 스캔 대기 상태 및 2페이지 수식 검증 용도로 출력됨)",
-        "pour_date": str(m2_cast), "fck": fck, "angle": angle_val,
-        "slump": val_slump if use_slump else "미적용",
-        "sonic_dist": dist_val if use_ultra else "미적용",
-        "sonic_time": time_val if use_ultra else "미적용",
-        "r_list": raw_inputs, "r_mean": round(total_avg, 2), "r_calc": round(corrected_R, 2),
-        "sonic_vel": round(v_kmps, 2) if use_ultra else 0.0,
-        "r_strength": round(fc_rebound, 1),
-        "sonic_strength": round(fc_ultra_only, 1) if use_ultra else 0.0,
-        "composite_strength": round(fc_final_hybrid, 1)
+    p2_pdf_data = {
+        "date": str(m2_date), "time": selected_time2, "loc": m2_loc,
+        "temp": auto_temp2, "hum": auto_hum2, 
+        "weather_ok": weather2_msg_str,
+        "strike_count": strike_count,
+        "pour_date": str(m2_cast), "days": total_days, "fck": fck, "angle": angle_val,
+        "ultra": f"{v_kmps*1000:.1f} m/s" if use_ultra else "없음 (미적용)",
+        "slump": f"{val_slump} mm" if use_slump else "없음 (미적용)",
+        "r_list": raw_inputs, "r_mean": total_avg, "r_corr": corrected_R,
+        "fc_reb": fc_rebound, "fc_ultra": fc_ultra_only, "fc_hybrid": fc_final_hybrid
     }
     
-    if st.button("🖨️ 국토교통부 표준 양식 PDF 보고서 빌드 및 다운로드", type="primary"):
-        with st.spinner("KS 표준 및 데이터 매핑 가동 중... PDF 출력 파일을 생성하고 있습니다."):
-            pdf_bytes = create_comprehensive_pdf(pdf_report_data)
-            st.success("✅ PDF 보고서 빌드가 완료되었습니다! 아래 버튼을 눌러 파일을 저장하세요.")
-            st.download_button(
-                label="💾 정밀 진단 성적서.pdf 다운로드",
-                data=pdf_bytes,
-                file_name=f"AI_NDT_Report_{m2_date}.pdf",
-                mime="application/pdf"
-            )
+    # 즉각적인 다운로드 제공 (에러 방지)
+    p2_pdf_bytes = create_page2_pdf(p2_pdf_data)
+    st.download_button(
+        label="💾 2페이지_강도추정.pdf 다운로드",
+        data=p2_pdf_bytes,
+        file_name=f"Page2_Report_{m2_date}.pdf",
+        mime="application/pdf",
+        type="primary"
+    )

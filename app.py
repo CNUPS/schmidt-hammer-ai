@@ -170,15 +170,23 @@ if API_KEYS["GEMINI_API"]:
     genai.configure(api_key=API_KEYS["GEMINI_API"])
 
 # =========================================================================
-# 🎨 Streamlit 기본 UI 숨기기
+# 🎨 Streamlit 기본 UI 숨기기 및 사이드바 항상 노출 설정
 # =========================================================================
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V36.0 (PDF 탑재)")
+# initial_sidebar_state="expanded" 를 추가하여 사이드바가 기본적으로 항상 열려있도록 설정
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V36.0 (PDF 탑재)", initial_sidebar_state="expanded")
 
+# 사이드바 접기 버튼을 아예 숨겨버리는 CSS 추가
 hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden; position: relative;}
-    /* header {visibility: hidden;}  <-- 이 부분을 주석 처리하여 좌측 상단 화살표(>) 버튼이 보이도록 복구했습니다! */
+    
+    /* 사이드바 접기/펴기 버튼 자체를 숨겨서 항상 열려있게 고정 */
+    [data-testid="collapsedControl"] {display: none !important;}
+    [data-testid="stSidebarCollapseButton"] {display: none !important;}
+    
+    /* 기존 오류를 유발했던 헤더 숨김 코드 삭제됨 */
+    
     [data-testid="stSidebarNav"] {display: none !important;}
     .block-container {
         padding-top: 2rem;
@@ -645,7 +653,7 @@ elif "2." in main_menu:
             st.info(gemini_text2)
 
     # =========================================================================
-    # 🖨️ 현장 정밀 진단 성적서 PDF 출력 구역 (여기가 새롭게 추가된 부분입니다!)
+    # 🖨️ 현장 정밀 진단 성적서 PDF 출력 구역
     # =========================================================================
     st.write("---")
     st.subheader("🖨️ AI 진단 및 복합 비파괴 성적서 PDF 출력")

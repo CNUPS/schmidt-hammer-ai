@@ -178,7 +178,7 @@ hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden; position: relative;}
-    header {visibility: hidden;}
+    /* header {visibility: hidden;}  <-- 이 부분을 주석 처리하여 좌측 상단 화살표(>) 버튼이 보이도록 복구했습니다! */
     [data-testid="stSidebarNav"] {display: none !important;}
     .block-container {
         padding-top: 2rem;
@@ -301,7 +301,7 @@ main_menu = st.sidebar.radio(
 )
 
 # =========================================================================
-# 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천 (기존 로직 100% 유지)
+# 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천
 # =========================================================================
 if "1." in main_menu:
     st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V36.0)")
@@ -497,7 +497,7 @@ if "1." in main_menu:
                 st.info(gemini_text)
 
 # =========================================================================
-# 2페이지: 다중 센서 및 환경 변수 복합 강도 연산 시스템 + PDF 출력 (기존 100% 유지 + PDF버튼)
+# 2페이지: 다중 센서 및 환경 변수 복합 강도 연산 시스템 + PDF 출력
 # =========================================================================
 elif "2." in main_menu:
     st.title("📊 국가표준(KRISS) 기반 다중 센서/환경 융합 강도 연산 시스템")
@@ -554,7 +554,7 @@ elif "2." in main_menu:
         raw_inputs = [st.number_input(f"{i}번째 R값", value=36.0 if i != 5 else 22.0, key=f"r_{i}") for i in range(1, strike_count + 1)]
 
     # =========================================================================
-    # ⚙️ 데이터 분석 연산 구역 (수정 없음)
+    # ⚙️ 데이터 분석 연산 구역
     # =========================================================================
     raw_arr = np.array(raw_inputs, dtype=float)
     total_avg = np.mean(raw_arr)

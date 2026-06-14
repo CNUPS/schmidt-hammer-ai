@@ -14,7 +14,7 @@ import io
 # 🔤 PDF 생성 및 폰트 설정 (ReportLab)
 # =========================================================================
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
@@ -78,12 +78,12 @@ def create_page1_pdf(data):
     story.append(Paragraph(cal_text, body_style))
     story.append(Spacer(1, 8))
     
+    # [버그 해결!] OpenCV 이미지를 PDF 포맷으로 안전하게 변환
     def cv2_to_rl(img_cv, w, h):
         if img_cv is None: return Paragraph("[이미지 없음]", table_text)
         is_success, buf = cv2.imencode(".jpg", img_cv)
         if not is_success: return Paragraph("[이미지 오류]", table_text)
-        from reportlab.platypus import Image as RLImage
-        return RLImage(io.BytesIO(buf), width=w, height=h)
+        return RLImage(io.BytesIO(buf.tobytes()), width=w, height=h)
         
     img_row1 = [Paragraph("<b>[선택 사진 1: AI 불균질 검출망]</b>", table_text), Paragraph("<b>[선택 사진 2: 최종 추천 타격점]</b>", table_text)]
     img_row2 = [cv2_to_rl(data.get('img_map'), 240, 240), cv2_to_rl(data.get('img_strike'), 240, 240)]
@@ -197,6 +197,10 @@ hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden; position: relative;}
+    
+    /* 사이드바 접기 버튼 완전 숨김 -> 항상 열려있게 고정 */
+    [data-testid="collapsedControl"] {display: none !important;}
+    
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -530,7 +534,7 @@ if "1." in main_menu:
             "dist": real_len, "area": calculated_area_cm2, "px_scale": p_scale_cm,
             "img_map": weather_map_img, "img_strike": strike_map_img,
             "defect_ratio": defect_ratio, "cand_count": final_selected_count,
-            "ai_comment": generate_static_engineering_commentary(1, "")
+            "ai_comment": generate_static_engineering_commentary(1, "").replace('\n', '<br/>')
         }
         
         p1_pdf_bytes = create_page1_pdf(p1_pdf_data)

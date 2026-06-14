@@ -78,7 +78,6 @@ def create_page1_pdf(data):
     story.append(Paragraph(cal_text, body_style))
     story.append(Spacer(1, 8))
     
-    # OpenCV 이미지를 PDF 포맷으로 즉시 변환하여 삽입
     def cv2_to_rl(img_cv, w, h):
         if img_cv is None: return Paragraph("[이미지 없음]", table_text)
         is_success, buf = cv2.imencode(".jpg", img_cv)
@@ -177,7 +176,6 @@ def create_page2_pdf(data):
     buffer.seek(0)
     return buffer
 
-
 # =========================================================================
 # 🔐 API 키 설정 구역
 # =========================================================================
@@ -191,20 +189,14 @@ if API_KEYS["GEMINI_API"]:
     genai.configure(api_key=API_KEYS["GEMINI_API"])
 
 # =========================================================================
-# 🎨 Streamlit 기본 UI 숨기기 및 사이드바 영구 고정
+# 🎨 Streamlit 기본 UI 설정 (사이드바 방해 요소 100% 제거)
 # =========================================================================
-# initial_sidebar_state="expanded" 를 추가하여 사이드바가 기본적으로 항상 열려있도록 설정
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V37.0 (듀얼 PDF)", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V38.0", initial_sidebar_state="expanded")
 
-# 사이드바 접는 버튼을 완전히 제거하여 메뉴가 무조건 보이게 만듦!
 hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden; position: relative;}
-    
-    /* 사이드바 접기 버튼 완전 숨김 -> 항상 열려있게 고정 */
-    [data-testid="collapsedControl"] {display: none !important;}
-    
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -327,7 +319,7 @@ main_menu = st.sidebar.radio(
 # 1페이지: AI 표면 스캔 및 시방서 기반 타격점 추천
 # =========================================================================
 if "1." in main_menu:
-    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V37.0)")
+    st.title("🎯 스마트 슈미트해머 5대 AI 표면 및 환경 신뢰도 판정 (V38.0)")
 
     st.subheader("📋 측정 환경 및 스캔 설정")
     c_hdr1, c_hdr2, c_hdr3, c_hdr4 = st.columns(4)
@@ -538,10 +530,9 @@ if "1." in main_menu:
             "dist": real_len, "area": calculated_area_cm2, "px_scale": p_scale_cm,
             "img_map": weather_map_img, "img_strike": strike_map_img,
             "defect_ratio": defect_ratio, "cand_count": final_selected_count,
-            "ai_comment": generate_static_engineering_commentary(1, "") # 기본 코멘트 자동 탑재
+            "ai_comment": generate_static_engineering_commentary(1, "")
         }
         
-        # 즉각적인 다운로드 제공 (에러 방지)
         p1_pdf_bytes = create_page1_pdf(p1_pdf_data)
         st.download_button(
             label="💾 1페이지_진단결과.pdf 다운로드",
@@ -720,7 +711,6 @@ elif "2." in main_menu:
         "fc_reb": fc_rebound, "fc_ultra": fc_ultra_only, "fc_hybrid": fc_final_hybrid
     }
     
-    # 즉각적인 다운로드 제공 (에러 방지)
     p2_pdf_bytes = create_page2_pdf(p2_pdf_data)
     st.download_button(
         label="💾 2페이지_강도추정.pdf 다운로드",

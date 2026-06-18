@@ -200,6 +200,31 @@ def generate_gemini_commentary(page_type, data_dict):
         pass
     return "실시간 종합 진단 결과가 완벽하게 도출되었습니다."
 
+def reliability_pct_calc(est, fck):
+    if fck == 0: return 0.0
+    return (est / fck) * 100.0
+
+def calculate_angle_correction(r_val, angle):
+    if angle == 0: return 0.0
+    if r_val <= 30: max_up, max_down = 3.2, -4.1
+    elif r_val <= 40: max_up, max_down = 2.8, -4.8
+    else: max_up, max_down = 2.2, -5.2
+    rad = math.radians(angle)
+    return max_up * math.sin(rad) if angle > 0 else max_down * abs(math.sin(rad))
+
+def make_time_options_korean():
+    return [f"{h:02d}시 {m:02d}분" for h in range(24) for m in [0, 30]]
+
+def parse_korean_time(time_text):
+    return int(time_text.split("시")[0]), int(time_text.split("시")[1].replace("분", "").strip())
+
+
+# =========================================================================
+# ⚙️ 사이드바 메인 탭 제어 (누락 복구 구역)
+# =========================================================================
+st.sidebar.header("⚙️ 스마트 분석 제어판")
+main_menu = st.sidebar.radio("작업 선택", ["1. 슈미트해머 측정 신뢰도 (AI 결함 우회)", "2. 다중 센서/환경 융합 강도 추정"])
+
 
 # =========================================================================
 # 1페이지: AI 표면 신뢰도 스캔

@@ -49,22 +49,43 @@ def cv2_to_rlimage(cv_img, target_width=240):
 # =========================================================================
 try:
     API_KEYS = {
-        "ROBOFLOW_API": st.secrets.get("ROBOFLOW_API", "wk4BcUKf1InnR2LjHPF8"),
+        "ROBOFLOW_API": st.secrets.get("ROBOFLOW_API", ""),
         "GEMINI_API": st.secrets.get("GEMINI_API", ""),
     }
+    ROBOFLOW_CUSTOM_MODEL_ID = st.secrets.get("ROBOFLOW_CUSTOM_MODEL_ID", "concrete_defect-j9nuw")
+    ROBOFLOW_CUSTOM_VERSION = str(st.secrets.get("ROBOFLOW_CUSTOM_VERSION", "1"))
 except Exception:
     API_KEYS = {
-        "ROBOFLOW_API": "wk4BcUKf1InnR2LjHPF8",
+        "ROBOFLOW_API": "",
         "GEMINI_API": "",
     }
+    ROBOFLOW_CUSTOM_MODEL_ID = "concrete_defect-j9nuw"
+    ROBOFLOW_CUSTOM_VERSION = "1"
 
 # 만약 Secrets 설정을 안했거나 수동 입력을 원할 경우를 위해 사이드바 하단에 안전 비밀 입력 가이드 제공
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔑 수동 API 키 덮어쓰기 (선택)")
-manual_gemini = st.sidebar.text_input("Gemini API Key 수동 등록", value="", type="password", help="Streamlit Secrets 환경을 설정하지 않은 경우 여기에 직접 키를 입력하셔도 정상 연동됩니다.")
+manual_roboflow = st.sidebar.text_input(
+    "Roboflow API Key 수동 등록",
+    value="",
+    type="password",
+    help="Streamlit Secrets 환경을 설정하지 않은 경우 여기에 직접 키를 입력하면 자체학습 AI 모델까지 연동됩니다."
+)
+
+manual_gemini = st.sidebar.text_input(
+    "Gemini API Key 수동 등록",
+    value="",
+    type="password",
+    help="Streamlit Secrets 환경을 설정하지 않은 경우 여기에 직접 키를 입력하셔도 정상 연동됩니다."
+)
+
+if manual_roboflow:
+    API_KEYS["ROBOFLOW_API"] = manual_roboflow
 
 if manual_gemini:
     API_KEYS["GEMINI_API"] = manual_gemini
+
+
 
 # 제미나이 설정 가동
 if API_KEYS["GEMINI_API"]:
@@ -89,45 +110,113 @@ st.markdown(hide_style, unsafe_allow_html=True)
 # =========================================================================
 def calculate_pixel_scale(p1_x, p1_y, p2_x, p2_y, real_length_mm):
     pixel_dist = math.sqrt((p2_x - p1_x) ** 2 + (p2_y - p1_y) ** 2)
-    if pixel_dist == 0: return 1.0, 0.0
+    if pixel_dist == 0:
+        return 1.0, 0.0
     return real_length_mm / pixel_dist, pixel_dist
+
 
 def evaluate_ks_weather(temp, hum):
     if temp < 5.0 or temp > 35.0 or hum >= 80.0:
         return False, "❌ [부적합] 온도가 5~35℃를 벗어나거나 습도가 80% 이상입니다. (KS F 2730 시방 기준 위반 주의)"
     return True, "✅ [적합] 온도와 습도가 허용 범위 내에 있어 측정 신뢰성이 높습니다. (KS F 2730 표준 부합)"
 
+
 def fetch_kma_weather_simulated(date_val, hour, minute, loc_str):
-    if not loc_str: loc_str = "서울"
+    if not loc_str:
+        loc_str = "서울"
     seed_str = f"{date_val}_{hour}:{minute}_{loc_str}"
     hash_val = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
     base_temp = 14.0 + (hash_val % 180) / 10.0
     base_hum = 45.0 + (hash_val % 35)
     return round(base_temp, 1), round(base_hum, 1)
 
+
 def fetch_roboflow_mask(img_bytes, workflow_id, classes_param, w, h):
     mask = np.zeros((h, w), dtype=np.uint8)
-    if not API_KEYS["ROBOFLOW_API"]: return mask
+    if not API_KEYS["ROBOFLOW_API"]:
+        return mask
+
     url = f"https://serverless.roboflow.com/workflows/-ovfhd/{workflow_id}/outputs?api_key={API_KEYS['ROBOFLOW_API']}"
     files = {"image": ("image.jpg", img_bytes, "image/jpeg")}
     payload = {"parameters": f'{{"classes": "{classes_param}"}}'}
+
     try:
-        res = requests.post(url, files=files, data=payload, timeout=15).json()
-        outputs = res.get("outputs", [{}])[0]
+        res = requests.post(url, files=files, data=payload, timeout=15)
+        data = res.json()
+        outputs = data.get("outputs", [{}])[0]
         preds = []
+
         for k, v in outputs.items():
-            if isinstance(v, dict) and "predictions" in v: preds = v["predictions"]; break
-            if k == "predictions" and isinstance(v, list): preds = v; break
+            if isinstance(v, dict) and "predictions" in v:
+                preds = v["predictions"]
+                break
+            if k == "predictions" and isinstance(v, list):
+                preds = v
+                break
+
         for p in preds:
             px, py = int(p.get("x", 0)), int(p.get("y", 0))
             pw, ph = int(p.get("width", 0)), int(p.get("height", 0))
+
             if pw > 0 and ph > 0:
-                x1, y1 = max(0, int(px - pw / 2)), max(0, int(py - ph / 2))
-                x2, y2 = min(w, int(px + pw / 2)), min(h, int(py + ph / 2))
+                x1 = max(0, int(px - pw / 2))
+                y1 = max(0, int(py - ph / 2))
+                x2 = min(w, int(px + pw / 2))
+                y2 = min(h, int(py + ph / 2))
                 cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1)
+
     except Exception:
         pass
+
     return mask
+
+
+def fetch_custom_roboflow_model_mask(img_bytes, w, h, confidence=25, overlap=30):
+    mask = np.zeros((h, w), dtype=np.uint8)
+
+    if not API_KEYS["ROBOFLOW_API"]:
+        return mask
+
+    model_id = "concrete_defect-j9nuw"
+    version = "1"
+
+    url = f"https://detect.roboflow.com/{model_id}/{version}"
+    params = {
+        "api_key": API_KEYS["ROBOFLOW_API"],
+        "confidence": confidence,
+        "overlap": overlap,
+        "format": "json"
+    }
+
+    try:
+        res = requests.post(
+            url,
+            params=params,
+            files={"file": ("image.jpg", img_bytes, "image/jpeg")},
+            timeout=20
+        )
+        data = res.json()
+        preds = data.get("predictions", [])
+
+        for p in preds:
+            px = int(p.get("x", 0))
+            py = int(p.get("y", 0))
+            pw = int(p.get("width", 0))
+            ph = int(p.get("height", 0))
+            conf = float(p.get("confidence", 0))
+
+            if pw > 0 and ph > 0 and conf >= confidence / 100:
+                x1 = max(0, int(px - pw / 2))
+                y1 = max(0, int(py - ph / 2))
+                x2 = min(w, int(px + pw / 2))
+                y2 = min(h, int(py + ph / 2))
+                cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1)
+
+    except Exception:
+        pass
+
+    return mask
+
 
 # =========================================================================
 # 🧠 Gemini 비파괴 정밀 분석 연동 (식, 측정값, 장소, 온도, 재령 종합)
@@ -274,17 +363,22 @@ if "1." in main_menu:
         else:
             st.warning("🟡 **Gemini AI API Key 미연동** (하단 수동 등록 혹은 클라우드 Secrets를 통해 키를 설정하면 100% 활성화됩니다)")
 
-    c_api1, c_api2, c_api3 = st.columns(3)
+      c_api1, c_api2, c_api3, c_api4 = st.columns(4)
+
     use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True)
     c_api1.caption("🔗 API: universe.roboflow.com/defect-detection")
-    
+
     use_model2 = c_api2.checkbox("Edge YOLO v9 (요철/불균질면 탐지)", value=True)
     c_api2.caption("🔗 API: universe.roboflow.com/shm")
-    
+
     use_model3 = c_api3.checkbox("Edge YOLO v10 (범용 결함 탐지)", value=True)
     c_api3.caption("🔗 API: universe.roboflow.com/concrete-defects")
 
+    use_custom_model = c_api4.checkbox("자체학습 AI 모델", value=True)
+    c_api4.caption("🔗 API: app.roboflow.com/-ovfhd/concrete_defect-j9nuw/train")
+
     st.write("---")
+
     uploaded_file = st.file_uploader("📸 벽면 촬영 정밀 비전 영상 업로드", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
@@ -314,9 +408,30 @@ if "1." in main_menu:
             
             is_success, buffer = cv2.imencode(".jpg", img_bgr)
             img_bytes = buffer.tobytes()
-            if use_model1: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-9", "crack", w, h))
-            if use_model2: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-10", "defect", w, h))
-            if use_model3: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-11", "defects", w, h))
+                       if use_model1:
+                final_defect = cv2.bitwise_or(
+                    final_defect,
+                    fetch_roboflow_mask(img_bytes, "general-segmentation-api-9", "crack", w, h)
+                )
+
+            if use_model2:
+                final_defect = cv2.bitwise_or(
+                    final_defect,
+                    fetch_roboflow_mask(img_bytes, "general-segmentation-api-10", "defect", w, h)
+                )
+
+            if use_model3:
+                final_defect = cv2.bitwise_or(
+                    final_defect,
+                    fetch_roboflow_mask(img_bytes, "general-segmentation-api-11", "defects", w, h)
+                )
+
+            if use_custom_model:
+                final_defect = cv2.bitwise_or(
+                    final_defect,
+                    fetch_custom_roboflow_model_mask(img_bytes, w, h)
+                )
+
 
         safe_area = cv2.bitwise_not(final_defect)
         margin = 40

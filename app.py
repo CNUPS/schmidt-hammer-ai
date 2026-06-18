@@ -21,7 +21,7 @@ from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# [중요] 한글 깨짐 완벽 방지 폰트 로직 (Github 연동 대비)
+# [중요] 한글 깨짐 및 에러 완벽 방지 폰트 로직
 font_path_cloud = "NanumGothic.ttf" # Github에 올릴 폰트 파일명
 font_path_local = "C:/Windows/Fonts/malgun.ttf" # 내 컴퓨터 윈도우 폰트 경로
 
@@ -32,7 +32,7 @@ try:
         pdfmetrics.registerFont(TTFont('KoreanFont', font_path_local))
     pdf_font = 'KoreanFont'
 except Exception:
-    pdf_font = 'Helvetica' # 최후의 수단 (영어만 지원)
+    pdf_font = 'Helvetica' # 최후의 수단
 
 # PDF 이미지 변환 헬퍼 함수
 def cv2_to_rlimage(cv_img, target_width=240):
@@ -66,7 +66,7 @@ if API_KEYS["GEMINI_API"]:
 # =========================================================================
 # 🎨 Streamlit 기본 UI 숨기기
 # =========================================================================
-st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V35.4 (Final Github)")
+st.set_page_config(layout="wide", page_title="Smart Schmidt Hammer AI System V35.5 (Final Github)")
 
 hide_style = """
     <style>
@@ -180,7 +180,6 @@ if "1." in main_menu:
     st.info(f"📡 외부 API 기상 관측 ➔ 기온: {auto_temp} ℃ / 상대습도: {auto_hum} %")
     st.write(weather_msg)
 
-    # 1. AI 모듈 및 사이트 주소 복구 구간
     st.markdown("#### 🧠 차세대 결함 검출 AI 인프라 연동 현황")
     c_api1, c_api2, c_api3 = st.columns(3)
     use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True)
@@ -270,7 +269,7 @@ if "1." in main_menu:
         st.write(ai_summary_txt)
 
         # =========================================================
-        # 🖨️ 1페이지 완전 복구형 PDF 빌더 (이미지, AI 모델 URL 포함)
+        # 🖨️ 1페이지 완전 복구형 PDF 빌더 (<b> 태그 제거됨!)
         # =========================================================
         def build_page1_pdf():
             buffer_p1 = io.BytesIO()
@@ -290,11 +289,13 @@ if "1." in main_menu:
                 styles1.add(ParagraphStyle(name='K_Head', fontName='Helvetica', fontSize=9))
 
             story1 = []
-            story1.append(Paragraph("<b>[제 1페이지] AI 표면 품질 검사보고서</b>", styles1['K_Title']))
+            
+            # [수정] 태그 제거
+            story1.append(Paragraph("[제 1페이지] AI 표면 품질 검사보고서", styles1['K_Title']))
             
             # 현장 정보 표
             info_data = [
-                [Paragraph("<b>품질 진단 항목</b>", styles1['K_Head']), Paragraph("<b>현장 실측 정보</b>", styles1['K_Head'])],
+                [Paragraph("품질 진단 항목", styles1['K_Head']), Paragraph("현장 실측 정보", styles1['K_Head'])],
                 [Paragraph("측정 대상 현장명", styles1['K_Norm']), Paragraph(f"{m_loc}", styles1['K_Norm'])],
                 [Paragraph("기상청 수신 환경", styles1['K_Norm']), Paragraph(f"기온: {auto_temp} ℃ / 상대습도: {auto_hum} %", styles1['K_Norm'])],
                 [Paragraph("목표 타격 확보 정밀도", styles1['K_Norm']), Paragraph(f"요구 횟수: {desired_strikes}회 / 확보율 {reliability_pct}%", styles1['K_Norm'])]
@@ -303,28 +304,28 @@ if "1." in main_menu:
             t_info1.setStyle(TableStyle([('BACKGROUND', (0,0), (1,0), colors.HexColor("#1A365D")), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
             story1.extend([t_info1, Spacer(1, 15)])
             
-            # AI 인프라 표 (URL 명시)
+            # AI 인프라 표
             ai_data = [
-                [Paragraph("<b>분석 인프라 모듈명</b>", styles1['K_Head']), Paragraph("<b>실시간 연동 상태 및 API 참조 주소</b>", styles1['K_Head'])],
+                [Paragraph("분석 인프라 모듈명", styles1['K_Head']), Paragraph("실시간 연동 상태 및 API 참조 주소", styles1['K_Head'])],
                 [Paragraph("Edge YOLO v8 Core", styles1['K_Norm']), Paragraph("활성화 완료 (API: universe.roboflow.com/defect-detection-0atjo)", styles1['K_Norm'])],
                 [Paragraph("Edge YOLO v9 Core", styles1['K_Norm']), Paragraph("활성화 완료 (API: universe.roboflow.com/shm)", styles1['K_Norm'])],
                 [Paragraph("Edge YOLO v10 Core", styles1['K_Norm']), Paragraph("활성화 완료 (API: universe.roboflow.com/concrete-defects)", styles1['K_Norm'])],
-                [Paragraph("Naver Cloud AI", styles1['K_Norm']), Paragraph("⏳ 추후 실시간 연동 대기", styles1['K_Norm'])],
-                [Paragraph("AWS AI / 자체 AI", styles1['K_Norm']), Paragraph("⏳ 추후 실시간 연동 대기", styles1['K_Norm'])]
+                [Paragraph("Naver Cloud AI", styles1['K_Norm']), Paragraph("추후 실시간 연동 대기", styles1['K_Norm'])],
+                [Paragraph("AWS AI / 자체 AI", styles1['K_Norm']), Paragraph("추후 실시간 연동 대기", styles1['K_Norm'])]
             ]
             t_ai1 = Table(ai_data, colWidths=[150, 370])
             t_ai1.setStyle(TableStyle([('BACKGROUND', (0,0), (1,0), colors.HexColor("#2B6CB0")), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
             story1.extend([t_ai1, Spacer(1, 15)])
             
             # 결과 이미지 삽입
-            story1.append(Paragraph("<b>▶ 컴퓨터 비전 기반 실시간 이미지 분석 맵핑 결과</b>", styles1['K_Sub']))
+            story1.append(Paragraph("▶ 컴퓨터 비전 기반 실시간 이미지 분석 맵핑 결과", styles1['K_Sub']))
             img_w = cv2_to_rlimage(vis_guided_img, 250)
             img_s = cv2_to_rlimage(strike_map_img, 250)
             t_img1 = Table([[img_w, img_s]], colWidths=[260, 260])
             t_img1.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
             story1.extend([t_img1, Spacer(1, 15)])
             
-            story1.append(Paragraph("<b>[AI 종합 요약 분석 최종 의견]</b>", styles1['K_Sub']))
+            story1.append(Paragraph("[AI 종합 요약 분석 최종 의견]", styles1['K_Sub']))
             story1.append(Paragraph(ai_summary_txt, styles1['K_Norm']))
             
             doc1.build(story1)
@@ -474,7 +475,8 @@ elif "2." in main_menu:
             styles_pdf.add(ParagraphStyle(name='KorTitle', fontName='Helvetica', fontSize=16))
             styles_pdf.add(ParagraphStyle(name='KorNorm', fontName='Helvetica', fontSize=10))
 
-        story_pdf = [Paragraph("<b>[제 2페이지] 다중 센서 복합 강도 성적서</b>", styles_pdf['KorTitle']), Spacer(1, 10)]
+        # [수정] 태그 제거
+        story_pdf = [Paragraph("[제 2페이지] 다중 센서 복합 강도 성적서", styles_pdf['KorTitle']), Spacer(1, 10)]
         
         data_info = [
             ["수행 일시", f"{m2_date} ({selected_time2})"],

@@ -298,7 +298,7 @@ if "1." in main_menu:
         else:
             st.warning("🟡 **Gemini AI API Key 미연동** (하단 수동 등록 혹은 클라우드 Secrets를 통해 키를 설정하면 100% 활성화됩니다)")
 
-   c_api1, c_api2, c_api3 = st.columns(3) 
+    c_api1, c_api2, c_api3 = st.columns(3) 
     use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True) 
     c_api1.caption("🔗 API: universe.roboflow.com/defect-detection") 
      
@@ -308,7 +308,7 @@ if "1." in main_menu:
     use_model3 = c_api3.checkbox("Edge YOLO v10 (범용 결함 탐지)", value=True) 
     c_api3.caption("🔗 API: universe.roboflow.com/concrete-defects") 
 
-    # --- 👇 여기에 자체 AI 모델 체크박스가 추가됩니다 ---
+    # --- 👇 자체 AI 모델 체크박스 추가 ---
     st.write("")
     use_custom_model = st.checkbox("자체 학습된 AI 모델", value=True)
     st.caption("🔗 사이트: https://app.roboflow.com/-ovfhd/concrete_defect-j9nuw/train")

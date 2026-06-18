@@ -363,7 +363,7 @@ if "1." in main_menu:
         else:
             st.warning("🟡 **Gemini AI API Key 미연동** (하단 수동 등록 혹은 클라우드 Secrets를 통해 키를 설정하면 100% 활성화됩니다)")
 
-      c_api1, c_api2, c_api3, c_api4 = st.columns(4)
+          c_api1, c_api2, c_api3, c_api4 = st.columns(4)
 
     use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True)
     c_api1.caption("🔗 API: universe.roboflow.com/defect-detection")
@@ -378,6 +378,7 @@ if "1." in main_menu:
     c_api4.caption("🔗 API: app.roboflow.com/-ovfhd/concrete_defect-j9nuw/train")
 
     st.write("---")
+
 
     uploaded_file = st.file_uploader("📸 벽면 촬영 정밀 비전 영상 업로드", type=["jpg", "jpeg", "png"])
 
@@ -406,9 +407,10 @@ if "1." in main_menu:
             edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 90)
             final_defect = cv2.bitwise_or(final_defect, edges)
             
-            is_success, buffer = cv2.imencode(".jpg", img_bgr)
+         is_success, buffer = cv2.imencode(".jpg", img_bgr)
             img_bytes = buffer.tobytes()
-                       if use_model1:
+
+            if use_model1:
                 final_defect = cv2.bitwise_or(
                     final_defect,
                     fetch_roboflow_mask(img_bytes, "general-segmentation-api-9", "crack", w, h)
@@ -431,6 +433,7 @@ if "1." in main_menu:
                     final_defect,
                     fetch_custom_roboflow_model_mask(img_bytes, w, h)
                 )
+
 
 
         safe_area = cv2.bitwise_not(final_defect)

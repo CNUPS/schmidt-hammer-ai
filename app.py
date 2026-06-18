@@ -128,6 +128,30 @@ def fetch_roboflow_mask(img_bytes, workflow_id, classes_param, w, h):
     except Exception:
         pass
     return mask
+def fetch_custom_roboflow_mask(img_bytes, w, h): 
+    mask = np.zeros((h, w), dtype=np.uint8) 
+    
+    # 알려주신 자체 AI 모델 주소와 Private API Key 적용
+    project_id = "concrete_defect-j9nuw"
+    version = "1" 
+    api_key = "wk4BcUKf1InnR2LjHPF8"
+    
+    url = f"https://detect.roboflow.com/{project_id}/{version}?api_key={api_key}" 
+    files = {"file": ("image.jpg", img_bytes, "image/jpeg")} 
+    
+    try: 
+        res = requests.post(url, files=files, timeout=15).json() 
+        preds = res.get("predictions", []) 
+        for p in preds: 
+            px, py = int(p.get("x", 0)), int(p.get("y", 0)) 
+            pw, ph = int(p.get("width", 0)), int(p.get("height", 0)) 
+            if pw > 0 and ph > 0: 
+                x1, y1 = max(0, int(px - pw / 2)), max(0, int(py - ph / 2)) 
+                x2, y2 = min(w, int(px + pw / 2)), min(h, int(py + ph / 2)) 
+                cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1) 
+    except Exception: 
+        pass 
+    return mask
 
 # =========================================================================
 # 🧠 Gemini 비파괴 정밀 분석 연동 (식, 측정값, 장소, 온도, 재령 종합)
@@ -274,17 +298,20 @@ if "1." in main_menu:
         else:
             st.warning("🟡 **Gemini AI API Key 미연동** (하단 수동 등록 혹은 클라우드 Secrets를 통해 키를 설정하면 100% 활성화됩니다)")
 
-    c_api1, c_api2, c_api3 = st.columns(3)
-    use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True)
-    c_api1.caption("🔗 API: universe.roboflow.com/defect-detection")
-    
-    use_model2 = c_api2.checkbox("Edge YOLO v9 (요철/불균질면 탐지)", value=True)
-    c_api2.caption("🔗 API: universe.roboflow.com/shm")
-    
-    use_model3 = c_api3.checkbox("Edge YOLO v10 (범용 결함 탐지)", value=True)
-    c_api3.caption("🔗 API: universe.roboflow.com/concrete-defects")
+   c_api1, c_api2, c_api3 = st.columns(3) 
+    use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True) 
+    c_api1.caption("🔗 API: universe.roboflow.com/defect-detection") 
+     
+    use_model2 = c_api2.checkbox("Edge YOLO v9 (요철/불균질면 탐지)", value=True) 
+    c_api2.caption("🔗 API: universe.roboflow.com/shm") 
+     
+    use_model3 = c_api3.checkbox("Edge YOLO v10 (범용 결함 탐지)", value=True) 
+    c_api3.caption("🔗 API: universe.roboflow.com/concrete-defects") 
 
-    st.write("---")
+    # --- 👇 여기에 자체 AI 모델 체크박스가 추가됩니다 ---
+    st.write("")
+    use_custom_model = st.checkbox("자체 학습된 AI 모델", value=True)
+    st.caption("🔗 사이트: https://app.roboflow.com/-ovfhd/concrete_defect-j9nuw/train")
     uploaded_file = st.file_uploader("📸 벽면 촬영 정밀 비전 영상 업로드", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
@@ -312,12 +339,15 @@ if "1." in main_menu:
             edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 90)
             final_defect = cv2.bitwise_or(final_defect, edges)
             
-            is_success, buffer = cv2.imencode(".jpg", img_bgr)
-            img_bytes = buffer.tobytes()
-            if use_model1: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-9", "crack", w, h))
-            if use_model2: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-10", "defect", w, h))
-            if use_model3: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-11", "defects", w, h))
-
+            is_success, buffer = cv2.imencode(".jpg", img_bgr) 
+            img_bytes = buffer.tobytes() 
+            if use_model1: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-9", "crack", w, h)) 
+            if use_model2: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-10", "defect", w, h)) 
+            if use_model3: final_defect = cv2.bitwise_or(final_defect, fetch_roboflow_mask(img_bytes, "general-segmentation-api-11", "defects", w, h)) 
+            
+            # --- 👇 자체 AI 모델 분석 데이터 추가 반영 ---
+            if use_custom_model: 
+                final_defect = cv2.bitwise_or(final_defect, fetch_custom_roboflow_mask(img_bytes, w, h))
         safe_area = cv2.bitwise_not(final_defect)
         margin = 40
         safe_area[:margin, :] = 0; safe_area[-margin:, :] = 0

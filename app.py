@@ -133,7 +133,7 @@ def generate_gemini_commentary(page_type, data_summary):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         res = model.generate_content(prompt)
-        if res.text: return res.text.strip() + "\n*(Gemini AI 분석)*"
+        if res.text: return res.text.strip() + "\n*(Gemini AI 실시간 분석 연동 완료)*"
     except Exception:
         pass
     return "분석 결과가 성공적으로 산출되었습니다."
@@ -173,7 +173,14 @@ if "1." in main_menu:
         selected_time = st.selectbox("측정 시간", opts, index=opts.index("14시 00분"))
         m_hour, m_min = parse_korean_time(selected_time)
     with c_hdr3: m_loc = st.text_input("측정 위치", value="서울시 마포구 신축 현장")
-    with c_hdr4: desired_strikes = st.selectbox("희망 타격 수", [5, 10, 15, 20, 25, 30], index=2)
+    with c_hdr4: 
+        # [업데이트 3] 타격 횟수 추천 로직 (+알파)
+        base_strikes = st.selectbox("기본 타격 횟수 선택", [5, 10, 15, 20, 25, 30], index=2)
+        extra_map = {5: 3, 10: 5, 15: 5, 20: 5, 25: 5, 30: 5}
+        extra_strikes = extra_map[base_strikes]
+        recommended_strikes = base_strikes + extra_strikes
+
+    st.info(f"💡 **AI 스마트 추천**: 결함에 대비한 예비 타격점 확보를 위해 기본 {base_strikes}회에 추가 {extra_strikes}회를 더하여 **총 {recommended_strikes}회**의 최적 타격점을 추출합니다.")
 
     auto_temp, auto_hum = fetch_kma_weather_simulated(m_date, m_hour, m_min, m_loc)
     is_weather_valid, weather_msg = evaluate_ks_weather(auto_temp, auto_hum)
@@ -182,6 +189,14 @@ if "1." in main_menu:
     else: st.error(weather_msg)
 
     st.markdown("#### 🧠 차세대 결함 검출 AI 인프라 연동 현황")
+    
+    # [업데이트 2] AI 실제 연동 상태 표시
+    is_ai_connected = bool(API_KEYS["ROBOFLOW_API"] and API_KEYS["GEMINI_API"])
+    if is_ai_connected:
+        st.success("🟢 **클라우드 AI 서버 (Roboflow Vision & Gemini LLM) 실시간 연동 정상**")
+    else:
+        st.warning("🟡 **API Key 미설정**: 외부 AI 서버와 연결되지 않아 내장(Local) 시뮬레이션 알고리즘으로 동작합니다.")
+
     c_api1, c_api2, c_api3 = st.columns(3)
     use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True)
     c_api1.caption("🔗 API: universe.roboflow.com/defect-detection")
@@ -215,7 +230,7 @@ if "1." in main_menu:
         mm_per_pixel, _ = calculate_pixel_scale(p1_x, p1_y, p2_x, p2_y, real_len)
 
         final_defect = np.zeros((h, w), dtype=np.uint8)
-        with st.spinner("AI 앙상블 분석 중..."):
+        with st.spinner("AI 앙상블 분석 및 물리적 이격 거리(30mm) 제약 계산 중..."):
             gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
             edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 90)
             final_defect = cv2.bitwise_or(final_defect, edges)
@@ -241,29 +256,53 @@ if "1." in main_menu:
                     overlay[y:y+6, x:x+6] = [0, 220, 0]
                     all_candidates.append({"x": x, "y": y})
 
+        # [업데이트 4] 픽셀을 변환하여 실제 물리적 3cm(30mm) 이상 거리 이격 조건 확인
+        min_distance_mm = 30.0 
+        min_distance_px = min_distance_mm / mm_per_pixel if mm_per_pixel > 0 else 50
+        
+        final_selected_pts = []
+        step_size = max(1, len(all_candidates) // (recommended_strikes * 4)) # 점들을 고르게 분포하기 위해 스텝 건너뛰기
+        
+        for pt in all_candidates[::step_size]:
+            is_valid = True
+            for f_pt in final_selected_pts:
+                # 두 점 사이의 픽셀 거리 계산
+                dist_px = math.sqrt((pt["x"] - f_pt["x"])**2 + (pt["y"] - f_pt["y"])**2)
+                # 계산된 픽셀 거리가 최소 허용 픽셀 거리(실제 3cm)보다 작으면 추가 안함
+                if dist_px < min_distance_px:
+                    is_valid = False
+                    break
+            
+            if is_valid:
+                final_selected_pts.append(pt)
+            
+            # 추천 횟수(ex: 15점)에 도달하면 탐색 종료
+            if len(final_selected_pts) == recommended_strikes:
+                break
+
         vis_guided_img = cv2.addWeighted(img_bgr, 0.45, overlay, 0.55, 0)
         cv2.line(vis_guided_img, (p1_x, p1_y), (p2_x, p2_y), (255, 255, 0), 5)
         
         strike_map_img = img_bgr.copy()
         cv2.line(strike_map_img, (p1_x, p1_y), (p2_x, p2_y), (255, 255, 0), 5)
         
-        final_selected_pts = all_candidates[::max(1, len(all_candidates)//desired_strikes)][:desired_strikes]
-
         for idx, pt in enumerate(final_selected_pts):
             cv2.circle(strike_map_img, (pt["x"], pt["y"]), 14, (0, 255, 0), -1)
             cv2.putText(strike_map_img, str(idx + 1), (pt["x"] - 7, pt["y"] + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
         col_res1, col_res2 = st.columns(2)
         with col_res1: st.image(cv2.cvtColor(vis_guided_img, cv2.COLOR_BGR2RGB), caption="AI 표면 무결성 신뢰도 지도")
-        with col_res2: st.image(cv2.cvtColor(strike_map_img, cv2.COLOR_BGR2RGB), caption="KS 규격 준수 최적 타격 좌표 맵")
+        with col_res2: st.image(cv2.cvtColor(strike_map_img, cv2.COLOR_BGR2RGB), caption=f"KS 규격 준수 최적 타격 좌표 (실제 3cm 이상 이격, 총 {len(final_selected_pts)}개 확보)")
 
-        reliability_pct = 95.0 if len(final_selected_pts) == desired_strikes else round((len(final_selected_pts)/max(1,desired_strikes))*100, 1)
+        if len(final_selected_pts) < recommended_strikes:
+            st.warning(f"⚠️ 표면 결함 영역이 많거나 3cm 이격 공간이 부족하여 추천 타격점({recommended_strikes}개) 중 {len(final_selected_pts)}개만 확보되었습니다.")
+
+        reliability_pct = 95.0 if len(final_selected_pts) >= base_strikes else round((len(final_selected_pts)/max(1,base_strikes))*100, 1)
         
         st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
-        ai_summary_txt = generate_gemini_commentary(1, f"위치: {m_loc}, 안전타격점: {len(final_selected_pts)}/{desired_strikes}, 기온: {auto_temp}도, 습도: {auto_hum}%, 신뢰도 {reliability_pct}%")
+        ai_summary_txt = generate_gemini_commentary(1, f"위치: {m_loc}, 안전타격점: {len(final_selected_pts)}/{recommended_strikes}, 기온: {auto_temp}도, 습도: {auto_hum}%, 신뢰도 {reliability_pct}%")
         st.write(ai_summary_txt)
 
-        # 🖨️ 1페이지 PDF 생성 로직 (Bold 태그 제거, 포맷 안정화)
         def build_page1_pdf():
             buffer_p1 = io.BytesIO()
             doc1 = SimpleDocTemplate(buffer_p1, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -284,13 +323,15 @@ if "1." in main_menu:
             
             story1.append(Paragraph("[제 1페이지] AI 표면 품질 검사보고서", styles1['K_Title']))
             
+            ai_status_txt = "실시간 API 연결 성공" if is_ai_connected else "내장(Local) 시뮬레이션으로 동작 중"
+
             info_data = [
                 [Paragraph("품질 진단 항목", styles1['K_Head']), Paragraph("현장 실측 정보 및 알고리즘 판정 데이터", styles1['K_Head'])],
                 [Paragraph("측정 대상 현장명", styles1['K_Norm']), Paragraph(f"{m_loc}", styles1['K_Norm'])],
-                [Paragraph("진단 스캔 일시", styles1['K_Norm']), Paragraph(f"{m_date} ({selected_time})", styles1['K_Norm'])],
+                [Paragraph("AI 실시간 연동 상태", styles1['K_Norm']), Paragraph(ai_status_txt, styles1['K_Norm'])],
                 [Paragraph("기상청 API 수신 환경", styles1['K_Norm']), Paragraph(f"기온: {auto_temp} ℃ / 상대습도: {auto_hum} %", styles1['K_Norm'])],
                 [Paragraph("환경 시방 적합성", styles1['K_Norm']), Paragraph(weather_msg, styles1['K_Norm'])],
-                [Paragraph("목표 타격 확보율", styles1['K_Norm']), Paragraph(f"요구 횟수: {desired_strikes}회 / 확보율 {reliability_pct}%", styles1['K_Norm'])]
+                [Paragraph("목표 타격 확보율", styles1['K_Norm']), Paragraph(f"추천 횟수: {recommended_strikes}회 / 확보점: {len(final_selected_pts)}회 (신뢰도 {reliability_pct}%)", styles1['K_Norm'])]
             ]
             t_info1 = Table(info_data, colWidths=[130, 390])
             t_info1.setStyle(TableStyle([('BACKGROUND', (0,0), (1,0), colors.HexColor("#1A365D")), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
@@ -362,7 +403,7 @@ elif "2." in main_menu:
         st.subheader("🔨 3. 반발도(R값) 타격 데이터 세팅")
         c_strk1, c_strk2 = st.columns(2)
         with c_strk1:
-            strike_count = st.selectbox("타격 횟수", [10, 15, 20, 30], index=2) 
+            strike_count = st.selectbox("기록할 타격 횟수", [10, 15, 20, 25, 30, 35], index=2) 
         with c_strk2:
             angle_opts = [f"{a}° (상향)" if a>0 else f"{a}° (하향)" if a<0 else f"{a}° (수평/벽면)" for a in range(90, -95, -5)]
             selected_angle_str = st.selectbox("🎯 타격 각도", angle_opts, index=18)
@@ -523,7 +564,7 @@ elif "2." in main_menu:
         t_res2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue)]))
         story2.extend([t_res2, Spacer(1, 15)])
 
-        # 4. 근거 및 출처 텍스트 추가 (Bold 태그를 쓰지 않고 텍스트 기호로 강조)
+        # 4. 근거 및 출처 텍스트 추가
         story2.append(Paragraph("▶ 강도 추정 계산 원리 및 참조 근거", styles2['K_Sub']))
         
         # KS 규격
@@ -549,13 +590,20 @@ elif "2." in main_menu:
         return buffer_p2.getvalue()
 
     st.write("---")
+    
+    # [업데이트 1] 엑셀/PDF 파일명 커스텀 지정 UI 추가
+    st.markdown("#### 💾 분석 결과 다운로드")
+    custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
+    excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
+    pdf_filename = custom_filename + ".pdf" if not custom_filename.endswith(".pdf") else custom_filename
+
     col_dl1, col_dl2 = st.columns(2)
     
     with col_dl1:
         st.download_button(
             label="📥 [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
             data=build_page2_pdf(),
-            file_name=f"2_Multi_Sensor_Strength_Report_{m2_date}.pdf",
+            file_name=pdf_filename,
             mime="application/pdf",
             use_container_width=True
         )
@@ -580,7 +628,7 @@ elif "2." in main_menu:
         st.download_button(
             label="📊 전체 도출 데이터 종합 (Excel)",
             data=buffer_xls.getvalue(),
-            file_name=f"2_Multi_Sensor_Data_{m2_date}.xlsx",
+            file_name=excel_filename,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )

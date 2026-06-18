@@ -4,3 +4,6 @@ numpy
 Pillow
 requests
 google-generativeai
+reportlab
+pandas
+openpyxl

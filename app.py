@@ -246,6 +246,8 @@ def generate_gemini_commentary(page_type, data_dict):
         model = genai.GenerativeModel("gemini-1.5-flash") 
         res = model.generate_content(prompt) 
         if res.text: return res.text.strip() + "\n\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*" 
+    except Exception as e: 
+        return f"🚨 Gemini API 에러 발생: {str(e)}\n\n💡 팁: Streamlit Secrets에 등록된 GEMINI_API 키가 'AIzaSy...'로 시작하는 올바른 구글 API 키인지 확인해 주세요!"
     except Exception: 
         pass 
     return "실시간 종합 진단 결과가 도출되었습니다."
@@ -444,6 +446,7 @@ if "1." in main_menu:
         
         # 다변수 종합 딕셔너리 구성 후 AI 요청
         # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
+        # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
         page1_data = { 
             "location": m_loc, 
             "date": str(m_date), 
@@ -455,7 +458,7 @@ if "1." in main_menu:
             "total_area_mm2": calc_total_area_mm2
         } 
 
-        # --- 👇 Secrets 키 자동 연동 연동 로직 철저히 적용 ---
+        # --- 👇 Secrets 키 자동 연동 로직 적용 (에러 차단 핵심) ---
         if not st.session_state.get("gemini_key_input") and "GEMINI_API" in st.secrets:
             API_KEYS["GEMINI_API"] = st.secrets["GEMINI_API"]
             genai.configure(api_key=st.secrets["GEMINI_API"])
@@ -468,7 +471,7 @@ if "1." in main_menu:
             ai_summary_txt = generate_gemini_commentary(1, page1_data)
             st.session_state["page1_ai_comment"] = ai_summary_txt
 
-        # 웹 화면 UI 출력
+        # 웹 화면 UI 출력 (중복 출력을 막기 위해 아이콘은 하나로 통일했습니다!)
         st.subheader("📊 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         st.info(ai_summary_txt)
 

@@ -440,8 +440,6 @@ if "1." in main_menu:
 
         reliability_pct = 95.0 if len(final_selected_pts) >= base_strikes else round((len(final_selected_pts)/max(1,base_strikes))*100, 1)
         
-        st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
-        
         # 다변수 종합 딕셔너리 구성 후 AI 요청
 # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
         page1_data = { 

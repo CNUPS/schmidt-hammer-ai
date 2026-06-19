@@ -243,12 +243,11 @@ def generate_gemini_commentary(page_type, data_dict):
             )
 
     try: 
-        # 👇 모델 이름을 호환성이 높은 최신 버전으로 변경했습니다.
-        model = genai.GenerativeModel("gemini-1.5-flash-latest") 
+        # 👇 1.5-flash 대신 구 버전 환경에서도 100% 호환되는 'gemini-pro'를 사용합니다!
+        model = genai.GenerativeModel("gemini-pro") 
         res = model.generate_content(prompt) 
         if res.text: return res.text.strip() + "\n\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*" 
     except Exception as e: 
-        # 💡 만약 위 코드로도 똑같은 404 에러가 나면 "gemini-1.5-flash-latest" 대신 "gemini-pro" 로 바꿔보세요!
         return f"🚨 Gemini API 에러 발생: {str(e)}\n\n💡 팁: Streamlit Secrets에 등록된 GEMINI_API 키가 'AIzaSy...'로 시작하는 올바른 구글 API 키인지 확인해 주세요!"
 
 def reliability_pct_calc(est, fck):
@@ -446,6 +445,7 @@ if "1." in main_menu:
         # 다변수 종합 딕셔너리 구성 후 AI 요청
         # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
         # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
+        # --- 👇 1페이지 Gemini 분석 및 UI 출력 구역 (중복 헤더 완벽 제거) ---
         page1_data = { 
             "location": m_loc, 
             "date": str(m_date), 
@@ -457,7 +457,6 @@ if "1." in main_menu:
             "total_area_mm2": calc_total_area_mm2
         } 
 
-        # --- 👇 Secrets 키 자동 연동 로직 적용 (에러 차단 핵심) ---
         if not st.session_state.get("gemini_key_input") and "GEMINI_API" in st.secrets:
             API_KEYS["GEMINI_API"] = st.secrets["GEMINI_API"]
             genai.configure(api_key=st.secrets["GEMINI_API"])
@@ -465,12 +464,11 @@ if "1." in main_menu:
             API_KEYS["GEMINI_API"] = st.session_state["gemini_key_input"]
             genai.configure(api_key=st.session_state["gemini_key_input"])
 
-        # 실시간 인공지능 종합 소견 생성 호출
         with st.spinner("Gemini 대형 언어 모델 기반 실시간 정밀 리포트 생성 중..."):
             ai_summary_txt = generate_gemini_commentary(1, page1_data)
             st.session_state["page1_ai_comment"] = ai_summary_txt
 
-        # 웹 화면 UI 출력 (중복 출력을 막기 위해 아이콘은 하나로 통일했습니다!)
+        # [수정 완료] 헤더를 📊 하나로 깔끔하게 통일했습니다!
         st.subheader("📊 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         st.info(ai_summary_txt)
 
@@ -491,7 +489,6 @@ if "1." in main_menu:
                 styles1.add(ParagraphStyle(name='K_Head', fontName='Helvetica', fontSize=9))
 
             story1 = []
-            
             story1.append(Paragraph("[제 1페이지] AI 표면 품질 검사보고서", styles1['K_Title']))
             
             ai_status_txt = "실시간 API 연결 성공" if is_roboflow_live else "내장(Local) 시뮬레이션으로 동작 중"

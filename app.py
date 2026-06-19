@@ -243,12 +243,12 @@ def generate_gemini_commentary(page_type, data_dict):
             )
 
     try: 
-        # 👇 1.5-flash 대신 구 버전 환경에서도 100% 호환되는 'gemini-pro'를 사용합니다!
-        model = genai.GenerativeModel("gemini-pro") 
+        # 👇 관리자님이 찾아주신 최신 무료 고성능 모델로 변경했습니다!
+        model = genai.GenerativeModel("gemini-3.1-flash-lite") 
         res = model.generate_content(prompt) 
         if res.text: return res.text.strip() + "\n\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*" 
     except Exception as e: 
-        return f"🚨 Gemini API 에러 발생: {str(e)}\n\n💡 팁: Streamlit Secrets에 등록된 GEMINI_API 키가 'AIzaSy...'로 시작하는 올바른 구글 API 키인지 확인해 주세요!"
+        return f"🚨 Gemini API 에러 발생: {str(e)}\n\n💡 팁: Streamlit Secrets에 등록된 GEMINI_API 키가 올바른지 확인해 주세요!"
 
 def reliability_pct_calc(est, fck):
     if fck == 0: return 0.0
@@ -443,9 +443,7 @@ if "1." in main_menu:
         st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         
         # 다변수 종합 딕셔너리 구성 후 AI 요청
-        # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
-        # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
-        # --- 👇 1페이지 Gemini 분석 및 UI 출력 구역 (중복 헤더 완벽 제거) ---
+# --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
         page1_data = { 
             "location": m_loc, 
             "date": str(m_date), 
@@ -457,6 +455,7 @@ if "1." in main_menu:
             "total_area_mm2": calc_total_area_mm2
         } 
 
+        # --- 👇 Secrets 키 자동 연동 로직 ---
         if not st.session_state.get("gemini_key_input") and "GEMINI_API" in st.secrets:
             API_KEYS["GEMINI_API"] = st.secrets["GEMINI_API"]
             genai.configure(api_key=st.secrets["GEMINI_API"])
@@ -464,11 +463,12 @@ if "1." in main_menu:
             API_KEYS["GEMINI_API"] = st.session_state["gemini_key_input"]
             genai.configure(api_key=st.session_state["gemini_key_input"])
 
+        # 실시간 인공지능 종합 소견 생성 호출
         with st.spinner("Gemini 대형 언어 모델 기반 실시간 정밀 리포트 생성 중..."):
             ai_summary_txt = generate_gemini_commentary(1, page1_data)
             st.session_state["page1_ai_comment"] = ai_summary_txt
 
-        # [수정 완료] 헤더를 📊 하나로 깔끔하게 통일했습니다!
+        # [수정 완료] 헤더를 📊 하나로 깔끔하게 통일했습니다! (📝 헤더는 삭제됨)
         st.subheader("📊 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         st.info(ai_summary_txt)
 

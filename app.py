@@ -156,73 +156,99 @@ def fetch_custom_roboflow_mask(img_bytes, w, h):
 # =========================================================================
 # 🧠 Gemini 비파괴 정밀 분석 연동 (식, 측정값, 장소, 온도, 재령 종합)
 # =========================================================================
-def generate_gemini_commentary(page_type, data_dict):
-    loc = data_dict.get("location", "서울 수색동 교량구간")
-    date_val = data_dict.get("date", str(datetime.date.today()))
-    temp = data_dict.get("temp", 20.0)
-    hum = data_dict.get("hum", 50)
-    age = data_dict.get("age", 28)
-    fck = data_dict.get("fck", 24.0)
-    r_val = data_dict.get("corrected_R", 35.0)
-    v_upv = data_dict.get("v_mps", 0.0)
-    slump = data_dict.get("slump", 150)
-    est_strength = data_dict.get("est_strength", 25.0)
-    ex_count = data_dict.get("ex_count", 0)
+def generate_gemini_commentary(page_type, data_dict): 
+    loc = data_dict.get("location", "서울 수색동 교량구간") 
+    date_val = data_dict.get("date", str(datetime.date.today())) 
+    temp = data_dict.get("temp", 20.0) 
+    hum = data_dict.get("hum", 50) 
     
-    strength_info = ""
-    if page_type == 2:
-        strength_info = f"""
+    # 1페이지용 추가 계산 데이터 (비전 스캔 결과)
+    defect_ratio = data_dict.get("defect_ratio", 0.0)
+    real_w_cm = data_dict.get("real_w_cm", 0.0)
+    real_h_cm = data_dict.get("real_h_cm", 0.0)
+    total_area_mm2 = data_dict.get("total_area_mm2", 0.0)
+
+    # 2페이지용 데이터 (슈미트 해머 강도 연산 결과)
+    age = data_dict.get("age", 28) 
+    fck = data_dict.get("fck", 24.0) 
+    r_val = data_dict.get("corrected_R", 35.0) 
+    v_upv = data_dict.get("v_mps", 0.0) 
+    slump = data_dict.get("slump", 150) 
+    est_strength = data_dict.get("est_strength", 25.0) 
+    ex_count = data_dict.get("ex_count", 0) 
+
+    if page_type == 1: 
+        prompt = f""" 
+        당신은 대한민국 국토교통부 콘크리트 표준시방서(KCS 14 20 00) 및 KS F 2730 표준을 마스터한 최고의 '콘크리트 비파괴 안전성 진단 기술사'입니다. 
+        다음 현장 데이터 및 AI 비전 분석 결과를 바탕으로 종합 소견을 공식 제출 보고서 양식에 맞게 한글 4문장 내외로 논리정연하게 작성하십시오. 
+
+        [측정 현장 및 기후 데이터] 
+        - 일시 및 장소: {date_val}, {loc} 
+        - 기상청 실시간 연동 기후: 기온 {temp}℃ / 상대습도 {hum}% 
+
+        [비전 스캔 AI 결함 분석 데이터] 
+        - 픽셀 캘리브레이션 기반 실제 사진 크기: 가로 {real_w_cm:.1f} cm x 세로 {real_h_cm:.1f} cm
+        - 실제 촬영된 총 벽면 면적: {total_area_mm2:.1f} mm²
+        - AI가 검출한 요철/불균질/균열 등 결함 영역 비율: 전체 사진 면적 대비 {defect_ratio:.2f}%
+
+        [작성 가이드라인] 
+        1. 기상 조건(온도/습도)이 당일 진단 작업 및 구조물 표면 건조 상태에 미치는 영향을 기술할 것. 
+        2. 제공된 사진의 실제 면적 크기와 결함 영역 비율({defect_ratio:.2f}%) 수치를 명확히 명시하며 벽면 상태가 양호한지 불량한지 정량적으로 평가할 것. 
+        3. 검출된 결함 비율을 토대로, 향후 슈미트 해머 타격 작업의 난이도와 예측되는 데이터의 신뢰성(값이 비교적 잘 나올지, 편차가 심할지 등)에 대한 기술사적 코멘트를 반드시 포함할 것. 
+        4. 전문가 특유의 정량화된 기술 문체(~입니다, ~하며, ~로 판단됩니다)를 사용할 것.
+        """ 
+    else: 
+        prompt = f""" 
+        당신은 대한민국 국토교통부 콘크리트 표준시방서(KCS 14 20 00) 및 KS F 2730 표준을 마스터한 최고의 '콘크리트 비파괴 안전성 진단 기술사'입니다.
+        다음 현장 실측 조건 데이터를 기반으로 공식 제출 보고서에 즉시 기재할 수 있는 엄격하고 정밀한 종합 분석 소견을 한글 4문장 내외로 논리정연하게 작성하십시오.
+        
+        [현장 물리 환경 데이터]
+        - 진단 현장 위치: {loc}
+        - 점검 수행 날짜: {date_val}
+        - 실시간 기상 상태: 기온 {temp}℃ / 상대습도 {hum}% (KS F 2730 기후 제한 조건 만족 여부 판단에 사용)
+        - 콘크리트 인자: 설계기준강도 {fck} MPa / 타설 후 경과 재령일수 {age}일
+        
+        [슈미트 해머 강도 연산 실측 결과]
         - 슈미트 해머 보정 평균 반발도(R값): {r_val:.1f} R (동적 이상치 {ex_count}개 제외 후 각도 보정 완료)
         - 초음파(UPV) 센서 수신 전파속도: {v_upv:.1f} m/s (주행거리 대비 프로브 응답)
         - 설계 슬럼프 변수: {slump} mm (공극 보정 계수 반영)
-        - 적용 강도 계산 공식:
-          1) 단일반발도(대한건축학회식): Fc = 1.3 * R - 14.0 (MPa)
-          2) 다중센서 융합식(SonReb 기법): Fc = 0.05 * R^1.2 * V^1.5 * 재령감쇠 * 기후보정
         - 종합 복합 산출 강도: {est_strength:.1f} MPa
-        """
+        
+        [작성 가이드라인] 
+        1. 기술사 특유의 엄격하고 정량화된 전문 기술 문체(~입니다, ~하며, ~로 판단됩니다)를 고수하십시오.
+        2. 당일 온습도 기후 데이터가 KS F 2730 기준에 어떻게 부합하여 측정 정확도 향상에 기여했는지 서술하십시오.
+        3. 도출된 최종 예측 압축강도({est_strength:.1f} MPa)가 타설 설계강도({fck} MPa)를 완벽히 상회하여 충분한 안정성 마진을 유지하고 있는지 평가하십시오.
+        4. 표면 경도 측정의 고유 한계를 극복하기 위해 '초음파 전파 주행속도({v_upv:.1f} m/s)' 및 '슬럼프 변동 제어' 융합 모델(SonReb)을 통해 어떻게 내부 결함 및 공극 왜곡 요소를 보정하고 정밀화했는지 학술적 논리로 강조해 주십시오.
+        """ 
 
-    prompt = f"""
-    당신은 대한민국 국토교통부 콘크리트 표준시방서(KCS 14 20 00) 및 KS F 2730 표준을 마스터한 최고의 '콘크리트 비파괴 안전성 진단 기술사'입니다.
-    다음 현장 실측 조건 데이터를 기반으로 공식 제출 보고서에 즉시 기재할 수 있는 엄격하고 정밀한 종합 분석 소견을 한글 4문장 내외로 논리정연하게 작성하십시오.
-    
-    [현장 물리 환경 데이터]
-    - 진단 현장 위치: {loc}
-    - 점검 수행 날짜: {date_val}
-    - 실시간 기상 상태: 기온 {temp}℃ / 상대습도 {hum}% (KS F 2730 기후 제한 조건 만족 여부 판단에 사용)
-    - 콘크리트 인자: 설계기준강도 {fck} MPa / 타설 후 경과 재령일수 {age}일
-    {strength_info}
-    
-    [작성 가이드라인]
-    1. 기술사 특유의 엄격하고 정량화된 전문 기술 문체(~입니다, ~하며, ~로 판단됩니다)를 고수하십시오.
-    2. 당일 온습도 기후 데이터가 KS F 2730 기준에 어떻게 부합하여 측정 정확도 향상에 기여했는지 서술하십시오.
-    3. 도출된 최종 예측 압축강도({est_strength:.1f} MPa)가 타설 설계강도({fck} MPa)를 완벽히 상회하여 충분한 안정성 마진을 유지하고 있는지 평가하십시오.
-    4. 2페이지 분석의 경우, 표면 경도 측정의 고유 한계를 극복하기 위해 '초음파 전파 주행속도({v_upv:.1f} m/s)' 및 '슬럼프 변동 제어' 융합 모델(SonReb)을 통해 어떻게 내부 결함 및 공극 왜곡 요소를 보정하고 정밀화했는지 학술적 논리로 강조해 주십시오.
-    """
+    if not API_KEYS["GEMINI_API"]: 
+        # 로컬 폴백 엔진 (괄호 결합 방식으로 줄바꿈 에러 완벽 차단)
+        if page_type == 1: 
+            ks_status = "적합" if (5.0 <= temp <= 35.0 and hum < 80) else "주의 필요" 
+            return (
+                f"{loc} 신축 벽면의 고해상도 이미지 비전 스캔 결과, 균열 및 표면 박리 취약 구역을 실시간 탐지하여 최적의 타격점을 배치하였습니다. "
+                f"시험 당일 대기 온도({temp}℃) 및 상대습도({hum}%) 환경은 KS F 2730 표준 기후 기준에 대비하여 '{ks_status}' 상태에 해당함을 판정하였으며, "
+                f"지정 타격점 간의 실제 이격 거리 제약인 30mm(3.0cm)를 검증 적용하여 수집 데이터의 신뢰성과 안전 구역 우회성을 확보하였습니다. "
+                f"*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
+            )
+        else: 
+            pct_attained = (est_strength / fck) * 100.0 if fck > 0 else 0 
+            status_msg = "우수한 수준의 안전 마진을 발현하고 있습니다" if est_strength >= fck else "설계 기준을 일부 만족하지 못하여 정기적 모니터링 추적이 요구됩니다" 
+            return (
+                f"{loc} 콘크리트 구조물의 비파괴 정밀 진단 결과, 이상치 {ex_count}개를 소거한 보정 반발도 {r_val:.1f} R과 설계 슬럼프({slump}mm) 보정률이 통합 적용되었습니다. "
+                f"확보된 재령일수 {age}일의 시간 경화 진행 상태에 따라 최종 산출된 융합 예측 강도는 {est_strength:.1f} MPa로 산출되었습니다. "
+                f"이는 원 설계강도 {fck} MPa 대비 {pct_attained:.1f}% 수치에 해당하는 결과로서 공학적으로 {status_msg}. "
+                f"특히 초음파 속도 변수({v_upv:.1f} m/s)의 결합을 통해 표면 건조 상태뿐만 아니라 부재 내부 골재의 조밀도까지 보정하여 진단 신뢰도를 혁신하였습니다. "
+                f"*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
+            )
 
-    if not API_KEYS["GEMINI_API"]:
-        # 로컬 폴백 엔진
-        if page_type == 1:
-            ks_status = "적합" if (5.0 <= temp <= 35.0 and hum < 80) else "주의 필요"
-            return f"{loc} 신축 벽면의 고해상도 이미지 비전 스캔 결과, 균열 및 표면 박리 취약 구역을 실시간 탐지하여 최적의 타격점을 배치하였습니다. " \
-                   f"시험 당일 대기 온도({temp}℃) 및 상대습도({hum}%) 환경은 KS F 2730 표준 기후 기준에 대비하여 '{ks_status}' 상태에 해당함을 판정하였으며, " \
-                   f"지정 타격점 간의 실제 이격 거리 제약인 30mm(3.0cm)를 검증 적용하여 수집 데이터의 신뢰성과 안전 구역 우회성을 확보하였습니다. " \
-                   f"*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
-        else:
-            pct_attained = (est_strength / fck) * 100.0 if fck > 0 else 0
-            status_msg = "우수한 수준의 안전 마진을 발현하고 있습니다" if est_strength >= fck else "설계 기준을 일부 만족하지 못하여 정기적 모니터링 추적이 요구됩니다"
-            return f"{loc} 콘크리트 구조물의 비파괴 정밀 진단 결과, 이상치 {ex_count}개를 소거한 보정 반발도 {r_val:.1f} R과 설계 슬럼프({slump}mm) 보정률이 통합 적용되었습니다. " \
-                   f"확보된 재령일수 {age}일의 시간 경화 진행 상태에 따라 최종 산출된 융합 예측 강도는 {est_strength:.1f} MPa로 산출되었습니다. " \
-                   f"이는 원 설계강도 {fck} MPa 대비 {pct_attained:.1f}% 수치에 해당하는 결과로서 공학적으로 {status_msg}. " \
-                   f"특히 초음파 속도 변수({v_upv:.1f} m/s)의 결합을 통해 표면 건조 상태뿐만 아니라 부재 내부 골재의 조밀도까지 보정하여 진단 신뢰도를 혁신하였습니다. " \
-                   f"*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
-
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        res = model.generate_content(prompt)
-        if res.text: return res.text.strip() + "\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*"
-    except Exception:
-        pass
-    return "실시간 종합 진단 결과가 완벽하게 도출되었습니다."
+    try: 
+        model = genai.GenerativeModel("gemini-1.5-flash") 
+        res = model.generate_content(prompt) 
+        if res.text: return res.text.strip() + "\n\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*" 
+    except Exception: 
+        pass 
+    return "실시간 종합 진단 결과가 도출되었습니다."
 
 def reliability_pct_calc(est, fck):
     if fck == 0: return 0.0
@@ -348,6 +374,17 @@ if "1." in main_menu:
             # --- 👇 자체 AI 모델 분석 데이터 추가 반영 ---
             if use_custom_model: 
                 final_defect = cv2.bitwise_or(final_defect, fetch_custom_roboflow_mask(img_bytes, w, h))
+
+            # --- 👇 [추가됨] 1페이지 Gemini를 위한 결함 면적 및 실제 크기 계산기 ---
+            defect_pixels = cv2.countNonZero(final_defect)
+            total_pixels = w * h
+            calc_defect_ratio = (defect_pixels / total_pixels) * 100 if total_pixels > 0 else 0
+            
+            calc_real_w_cm = (w * mm_per_pixel) / 10
+            calc_real_h_cm = (h * mm_per_pixel) / 10
+            calc_total_area_mm2 = (w * mm_per_pixel) * (h * mm_per_pixel)
+            # -----------------------------------------------------------
+
         safe_area = cv2.bitwise_not(final_defect)
         margin = 40
         safe_area[:margin, :] = 0; safe_area[-margin:, :] = 0
@@ -406,14 +443,15 @@ if "1." in main_menu:
         st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         
         # 다변수 종합 딕셔너리 구성 후 AI 요청
-        page1_data = {
-            "location": m_loc,
-            "date": str(m_date),
-            "temp": auto_temp,
-            "hum": auto_hum,
-            "age": 28,
-            "fck": 24.0,
-            "est_strength": 24.0
+        page1_data = { 
+            "location": m_loc, 
+            "date": str(m_date), 
+            "temp": auto_temp, 
+            "hum": auto_hum, 
+            "defect_ratio": calc_defect_ratio,
+            "real_w_cm": calc_real_w_cm,
+            "real_h_cm": calc_real_h_cm,
+            "total_area_mm2": calc_total_area_mm2
         }
         ai_summary_txt = generate_gemini_commentary(1, page1_data)
         st.info(ai_summary_txt)

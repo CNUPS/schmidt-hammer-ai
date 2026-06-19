@@ -443,6 +443,7 @@ if "1." in main_menu:
         st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         
         # 다변수 종합 딕셔너리 구성 후 AI 요청
+        # --- 👇 1페이지 Gemini를 위한 정밀 계산 데이터 정리 ---
         page1_data = { 
             "location": m_loc, 
             "date": str(m_date), 
@@ -452,8 +453,23 @@ if "1." in main_menu:
             "real_w_cm": calc_real_w_cm,
             "real_h_cm": calc_real_h_cm,
             "total_area_mm2": calc_total_area_mm2
-        }
-        ai_summary_txt = generate_gemini_commentary(1, page1_data)
+        } 
+
+        # --- 👇 Secrets 키 자동 연동 연동 로직 철저히 적용 ---
+        if not st.session_state.get("gemini_key_input") and "GEMINI_API" in st.secrets:
+            API_KEYS["GEMINI_API"] = st.secrets["GEMINI_API"]
+            genai.configure(api_key=st.secrets["GEMINI_API"])
+        elif st.session_state.get("gemini_key_input"):
+            API_KEYS["GEMINI_API"] = st.session_state["gemini_key_input"]
+            genai.configure(api_key=st.session_state["gemini_key_input"])
+
+        # 실시간 인공지능 종합 소견 생성 호출
+        with st.spinner("Gemini 대형 언어 모델 기반 실시간 정밀 리포트 생성 중..."):
+            ai_summary_txt = generate_gemini_commentary(1, page1_data)
+            st.session_state["page1_ai_comment"] = ai_summary_txt
+
+        # 웹 화면 UI 출력
+        st.subheader("📊 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         st.info(ai_summary_txt)
 
         def build_page1_pdf():

@@ -243,14 +243,13 @@ def generate_gemini_commentary(page_type, data_dict):
             )
 
     try: 
-        model = genai.GenerativeModel("gemini-1.5-flash") 
+        # 👇 모델 이름을 호환성이 높은 최신 버전으로 변경했습니다.
+        model = genai.GenerativeModel("gemini-1.5-flash-latest") 
         res = model.generate_content(prompt) 
         if res.text: return res.text.strip() + "\n\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*" 
     except Exception as e: 
+        # 💡 만약 위 코드로도 똑같은 404 에러가 나면 "gemini-1.5-flash-latest" 대신 "gemini-pro" 로 바꿔보세요!
         return f"🚨 Gemini API 에러 발생: {str(e)}\n\n💡 팁: Streamlit Secrets에 등록된 GEMINI_API 키가 'AIzaSy...'로 시작하는 올바른 구글 API 키인지 확인해 주세요!"
-    except Exception: 
-        pass 
-    return "실시간 종합 진단 결과가 도출되었습니다."
 
 def reliability_pct_calc(est, fck):
     if fck == 0: return 0.0

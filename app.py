@@ -21,6 +21,43 @@ def parse_korean_time(time_str):
     except Exception:
         return 14, 0
 #=======
+def calculate_angle_correction(r_avg, angle):
+    """
+    KS F 2730 규격에 따른 슈미트해머 타격 각도별 반발도(R값) 보정치 계산 함수
+    - angle: 0(수평), 90(정하향), -90(정상향), 45(경사하향), -45(경사상향) 등
+    """
+    try:
+        angle_val = float(angle)
+    except Exception:
+        return 0.0
+
+    # 반발도 평균(r_avg) 구간에 따른 각도 보정치 선형 보간/매핑 로직
+    # 일반적인 콘크리트 강도 구간(R=20~50) 기준 표준 보정값 테이블 반영
+    if angle_val == 0:
+        return 0.0
+        
+    elif angle_val == 90:  # 정하향 타격 (반발도가 높게 나오므로 빼줌)
+        if r_avg <= 20: return -5.0
+        elif r_avg <= 30: return -4.5
+        elif r_avg <= 40: return -4.0
+        else: return -3.5
+        
+    elif angle_val == -90: # 정상향 타격 (반발도가 낮게 나오므로 더해줌)
+        if r_avg <= 20: return 4.0
+        elif r_avg <= 30: return 3.5
+        elif r_avg <= 40: return 3.0
+        else: return 2.5
+        
+    elif angle_val == 45:  # 경사 하향
+        if r_avg <= 30: return -3.0
+        else: return -2.5
+        
+    elif angle_val == -45: # 경사 상향
+        if r_avg <= 30: return 3.0
+        else: return 2.5
+        
+    return 0.0
+#====
 
 import math
 import hashlib

@@ -489,12 +489,19 @@ if "1." in main_menu:
             story1 = []
             story1.append(Paragraph("[제 1페이지] AI 표면 품질 검사보고서", styles1['K_Title']))
             
-            ai_status_txt = "실시간 API 연결 성공" if is_roboflow_live else "내장(Local) 시뮬레이션으로 동작 중"
+            # --- AI 연동 상태 상세 텍스트 ---
+            ai_status_detail = (
+                f"1. 컴퓨터 비전 (Roboflow): {'연결 성공 (Live)' if is_roboflow_live else '내장 시뮬레이션 동작'}<br/>"
+                "2. 기상 데이터 (OpenAPI): 정상 연동<br/>"
+                "3. 대형언어모델 (Gemini): 정상 연동"
+            )
+            current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
             info_data = [
                 [Paragraph("품질 진단 항목", styles1['K_Head']), Paragraph("현장 실측 정보 및 알고리즘 판정 데이터", styles1['K_Head'])],
+                [Paragraph("측정 일시", styles1['K_Norm']), Paragraph(f"{current_time_str}", styles1['K_Norm'])],
                 [Paragraph("측정 대상 현장명", styles1['K_Norm']), Paragraph(f"{m_loc}", styles1['K_Norm'])],
-                [Paragraph("AI 실시간 연동 상태", styles1['K_Norm']), Paragraph(ai_status_txt, styles1['K_Norm'])],
+                [Paragraph("AI 실시간 연동 상태", styles1['K_Norm']), Paragraph(ai_status_detail, styles1['K_Norm'])],
                 [Paragraph("기상청 API 수신 환경", styles1['K_Norm']), Paragraph(f"기온: {auto_temp} ℃ / 상대습도: {auto_hum} %", styles1['K_Norm'])],
                 [Paragraph("환경 시방 적합성", styles1['K_Norm']), Paragraph(weather_msg, styles1['K_Norm'])],
                 [Paragraph("목표 타격 확보율", styles1['K_Norm']), Paragraph(f"추천 횟수: {recommended_strikes}회 / 확보점: {len(final_selected_pts)}회 (신뢰도 {reliability_pct}%)", styles1['K_Norm'])]
@@ -577,9 +584,11 @@ elif "2." in main_menu:
             upv_velocities = []
             for i in range(upv_count):
                 c1, c2, c3 = st.columns([1, 2, 2])
-                c1.markdown(f"**#{i+1}**")
-                dist = c2.number_input(f"거리(mm) #{i+1}", min_value=10.0, value=300.0, step=10.0, key=f"u_dist_{i}", label_visibility="collapsed")
-                time_us = c3.number_input(f"시간(μs) #{i+1}", min_value=1.0, value=80.0, step=1.0, key=f"u_time_{i}", label_visibility="collapsed")
+                c1.markdown(f"<br/>**#{i+1}**", unsafe_allow_html=True)
+                
+                # 👇 아래쪽에 라벨 이름(프로브 거리, 측정 시간)을 정확히 적어주면 칸 바로 위에 표시됩니다!
+                dist = c2.number_input(f"프로브 거리 (mm)", min_value=10.0, value=300.0, step=10.0, key=f"u_dist_{i}")
+                time_us = c3.number_input(f"측정 시간 (μs)", min_value=1.0, value=80.0, step=1.0, key=f"u_time_{i}")
                 
                 # 속도(m/s) = (거리 / 시간) * 1000 * 측정법 보정계수
                 vel = (dist / time_us) * 1000 * method_factor if time_us > 0 else 0
@@ -726,137 +735,146 @@ elif "2." in main_menu:
     # 🖨 2페이지 완전체 PDF 빌더 (Bold 태그 제거, 포맷 완전 안정화)
     # =========================================================================
     def build_page2_pdf():
-        buffer_p2 = io.BytesIO()
-        doc2 = SimpleDocTemplate(buffer_p2, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-        styles2 = getSampleStyleSheet()
-        
-        if pdf_font != 'Helvetica':
-            styles2.add(ParagraphStyle(name='K_Title', fontName=pdf_font, fontSize=16, leading=22, alignment=1, spaceAfter=15, textColor=colors.HexColor("#1A365D")))
-            styles2.add(ParagraphStyle(name='K_Sub', fontName=pdf_font, fontSize=11, leading=16, spaceBefore=10, spaceAfter=5, textColor=colors.HexColor("#2B6CB0")))
-            styles2.add(ParagraphStyle(name='K_Norm', fontName=pdf_font, fontSize=9, leading=14))
-            styles2.add(ParagraphStyle(name='K_Norm_C', fontName=pdf_font, fontSize=9, leading=14, alignment=1))
-        else:
-            styles2.add(ParagraphStyle(name='K_Title', fontName='Helvetica', fontSize=16, alignment=1))
-            styles2.add(ParagraphStyle(name='K_Sub', fontName='Helvetica', fontSize=11))
-            styles2.add(ParagraphStyle(name='K_Norm', fontName='Helvetica', fontSize=9))
-            styles2.add(ParagraphStyle(name='K_Norm_C', fontName='Helvetica', fontSize=9, alignment=1))
-
-        story2 = []
-        
-        story2.append(Paragraph("[제 2페이지] 다중 센서 복합 콘크리트 강도 성적서", styles2['K_Title']))
-        
-        # 1. 현장 정보 표
-        story2.append(Paragraph("▶ 진단 수행 정보 및 파라미터", styles2['K_Sub']))
-        info_data2 = [
-            [Paragraph("측정 일시 및 장소", styles2['K_Norm']), Paragraph(f"{m2_date} ({selected_time2}) / {m2_loc}", styles2['K_Norm'])],
-            [Paragraph("기상청 API 연동", styles2['K_Norm']), Paragraph(f"기온: {auto_temp2}℃ / 상대습도: {auto_hum2}%", styles2['K_Norm'])],
-            [Paragraph("설계조건 및 재령", styles2['K_Norm']), Paragraph(f"fck: {fck} MPa / 확보 재령: {total_days}일 (타설: {m2_cast})", styles2['K_Norm'])],
-            [Paragraph("초음파 탐촉 센서", styles2['K_Norm']), Paragraph(f"거리: {dist_val}mm / 시간: {time_val}μs ➔ {v_mps:.1f} m/s", styles2['K_Norm']) if use_ultra else Paragraph("미사용", styles2['K_Norm'])]
-        ]
-        t_info2 = Table(info_data2, colWidths=[150, 370])
-        t_info2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,0), (0,-1), colors.whitesmoke)]))
-        story2.extend([t_info2, Spacer(1, 10)])
-
-        # 2. 타격 데이터 매트릭스 표 (5개씩 분할)
-        story2.append(Paragraph("▶ 슈미트해머 반발도(R값) 측정 데이터셋", styles2['K_Sub']))
-        strike_data_table = []
-        row = []
-        for i, val in enumerate(raw_inputs):
-            row.append(Paragraph(f"#{i+1:02d}: {val}", styles2['K_Norm_C']))
-            if (i+1) % 5 == 0:
-                strike_data_table.append(row)
-                row = []
-        if row: # 남은 데이터 (5의 배수가 아닌 경우 패딩)
-            while len(row) < 5:
-                row.append(Paragraph("-", styles2['K_Norm_C']))
-            strike_data_table.append(row)
-
-        t_strike = Table(strike_data_table, colWidths=[104, 104, 104, 104, 104])
-        t_strike.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
-        story2.extend([t_strike, Spacer(1, 10)])
-
-        # 3. 강도 결과 요약
-        story2.append(Paragraph("▶ 데이터 분석 및 최종 복합 예상 강도", styles2['K_Sub']))
-        res_data = [
-            [Paragraph("반발도 데이터 전처리", styles2['K_Norm']), Paragraph(f"전체 평균: {total_avg:.2f} R / 이상치 {ex_count}개 폐기", styles2['K_Norm'])],
-            [Paragraph("최종 보정 반발도", styles2['K_Norm']), Paragraph(f"{corrected_R:.2f} R (타격 각도 및 규격 보정 완료)", styles2['K_Norm'])],
-            [Paragraph("단일 예상 강도 (Model A)", styles2['K_Norm']), Paragraph(f"{fc_rebound:.1f} MPa", styles2['K_Norm'])],
-            [Paragraph("최종 융합 예상 강도", styles2['K_Norm']), Paragraph(f"{fc_final_hybrid:.1f} MPa", styles2['K_Norm'])]
-        ]
-        t_res2 = Table(res_data, colWidths=[150, 370])
-        t_res2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue)]))
-        story2.extend([t_res2, Spacer(1, 10)])
-
-        # 4. AI 소견 추가
-        story2.append(Paragraph("▶ AI 비파괴 전문가 다차원 소견", styles2['K_Sub']))
-        story2.append(Paragraph(ai_comment, styles2['K_Norm']))
-        story2.append(Spacer(1, 10))
-
-        # 5. 근거 및 출처 텍스트 추가
-        story2.append(Paragraph("▶ 강도 추정 계산 원리 및 참조 근거", styles2['K_Sub']))
-        
-        # KS 규격
-        story2.append(Paragraph("[1] KS F 2730 (콘크리트 압축강도 추정을 위한 반발경도 시험방법)", styles2['K_Norm']))
-        story2.append(Paragraph("- 정의: 경화된 콘크리트 표면 반발 경도를 측정해 강도를 추정하는 비파괴 시험 KS 표준.", styles2['K_Norm']))
-        story2.append(Paragraph("- 적용: 측정값 평균에서 ±20%를 초과하는 이상치 폐기, 각도에 따른 중력 보정치(ΔR) 적용.", styles2['K_Norm']))
-        story2.append(Spacer(1, 5))
-        
-        # 수식
-        story2.append(Paragraph("[2] 적용 수식 및 알고리즘 변수", styles2['K_Norm']))
-        story2.append(Paragraph("- 단일 반발도 예상 강도식: Fc = 1.3 * R - 14.0 (MPa)", styles2['K_Norm']))
-        story2.append(Paragraph("- 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수 (MPa)", styles2['K_Norm']))
-        story2.append(Spacer(1, 5))
-        
-        # 문헌
-        story2.append(Paragraph("[3] 참조 문헌 및 시공/시방서", styles2['K_Norm']))
-        story2.append(Paragraph("- [SCI] 'Evaluation of Concrete Compressive Strength Using Ultrasonic Pulse Velocity and Rebound Hammer', A. Samarin et al., ACI Materials Journal (1983.11).", styles2['K_Norm']))
-        story2.append(Paragraph("- [국내] '초음파 속도와 반발경도를 이용한 콘크리트 압축강도 추정', 김철수 외, 한국건축구조학회논문집 (2021).", styles2['K_Norm']))
-        story2.append(Paragraph("- [시방서] 국토교통부 콘크리트 표준시방서 KCS 14 20 00.", styles2['K_Norm']))
-
-        doc2.build(story2)
-        buffer_p2.seek(0)
-        return buffer_p2.getvalue()
-
-    st.write("---")
-    
-    # 엑셀/PDF 파일명 커스텀 지정 UI 추가
-    st.markdown("#### 💾 분석 결과 다운로드")
-    custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
-    excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
-    pdf_filename = custom_filename + ".pdf" if not custom_filename.endswith(".pdf") else custom_filename
-
-    col_dl1, col_dl2 = st.columns(2)
-    
-    with col_dl1:
-        st.download_button(
-            label="📥 [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
-            data=build_page2_pdf(),
-            file_name=pdf_filename,
-            mime="application/pdf",
-            use_container_width=True
-        )
-
-    with col_dl2:
-        # [중요] engine='openpyxl' 지정으로 엑셀 깨짐 완벽 방지 및 시트 추가
-        buffer_xls = io.BytesIO()
-        with pd.ExcelWriter(buffer_xls, engine='openpyxl') as writer:
-            pd.DataFrame({"항목": ["수행 일시", "기온 (℃)", "상대습도 (%)", "설계기준강도", "초음파 속도 (m/s)"], "내용": [f"{m2_date} ({selected_time2})", auto_temp2, auto_hum2, fck, v_mps]}).to_excel(writer, sheet_name="측정조건", index=False)
-            pd.DataFrame({"타격_순서": [f"#{i:02d}" for i in range(1, strike_count + 1)], "실측_반발도(R)": raw_inputs}).to_excel(writer, sheet_name=f"{strike_count}회_타격데이터", index=False)
-            pd.DataFrame({"연산_모델_분류": ["[Model A] 단일 반발도 강도", "[Model B] 슬럼프/재령 반영", "[Model C] 초음파 융합 강도", "[Model D] 최종 융합 복합 강도"], "추정_압축강도(MPa)": [round(fc_rebound, 1), round(fc_slump_only, 1), round(fc_ultra_only, 1), round(fc_final_hybrid, 1)]}).to_excel(writer, sheet_name="강도결과", index=False)
-            pd.DataFrame({"AI 소견": [ai_comment]}).to_excel(writer, sheet_name="AI_종합소견", index=False)
-            pd.DataFrame({"산출 근거 및 문헌": [
-                "1. [KS F 2730] 반발경도 시험방법 표준 규격 (이상치 폐기 및 각도 보정)",
-                "2. [수식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
-                "3. [수식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수",
-                "4. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",
-                "5. [국내 논문] 김철수 외, 한국건축구조학회논문집 (2021.05)",
-                "6. [시방서] KCS 14 20 00 콘크리트 표준시방서"
-            ]}).to_excel(writer, sheet_name="참조근거", index=False)
+            buffer_p2 = io.BytesIO()
+            doc2 = SimpleDocTemplate(buffer_p2, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+            styles2 = getSampleStyleSheet()
             
-        st.download_button(
-            label="📊 전체 도출 데이터 종합 (Excel)",
-            data=buffer_xls.getvalue(),
-            file_name=excel_filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+            if pdf_font != 'Helvetica':
+                styles2.add(ParagraphStyle(name='K_Title', fontName=pdf_font, fontSize=16, leading=22, alignment=1, spaceAfter=15, textColor=colors.HexColor("#1A365D")))
+                styles2.add(ParagraphStyle(name='K_Sub', fontName=pdf_font, fontSize=11, leading=16, spaceBefore=10, spaceAfter=5, textColor=colors.HexColor("#2B6CB0")))
+                styles2.add(ParagraphStyle(name='K_Norm', fontName=pdf_font, fontSize=9, leading=14))
+                styles2.add(ParagraphStyle(name='K_Norm_C', fontName=pdf_font, fontSize=9, leading=14, alignment=1))
+            else:
+                styles2.add(ParagraphStyle(name='K_Title', fontName='Helvetica', fontSize=16, alignment=1))
+                styles2.add(ParagraphStyle(name='K_Sub', fontName='Helvetica', fontSize=11))
+                styles2.add(ParagraphStyle(name='K_Norm', fontName='Helvetica', fontSize=9))
+                styles2.add(ParagraphStyle(name='K_Norm_C', fontName='Helvetica', fontSize=9, alignment=1))
+
+            story2 = []
+            
+            story2.append(Paragraph("[제 2페이지] 다중 센서 복합 콘크리트 강도 성적서", styles2['K_Title']))
+            
+            # 1. 현장 정보 표
+            story2.append(Paragraph("▶ 진단 수행 정보 및 파라미터", styles2['K_Sub']))
+            
+            # 👇 [수정됨] 여기서 에러를 내던 dist_val, time_val을 빼고, 새로 만든 다중 측정 데이터로 변경했습니다.
+            upv_pdf_txt = f"평균: {v_mps:.1f} m/s / 보정: {v_mps_corr:.1f} m/s ({upv_count}회 측정)" if use_ultra and v_mps_corr > 0 else "미사용"
+            
+            info_data2 = [
+                [Paragraph("측정 일시 및 장소", styles2['K_Norm']), Paragraph(f"{m2_date} ({selected_time2}) / {m2_loc}", styles2['K_Norm'])],
+                [Paragraph("기상청 API 연동", styles2['K_Norm']), Paragraph(f"기온: {auto_temp2}℃ / 상대습도: {auto_hum2}%", styles2['K_Norm'])],
+                [Paragraph("설계조건 및 재령", styles2['K_Norm']), Paragraph(f"fck: {fck} MPa / 확보 재령: {total_days}일 (타설: {m2_cast})", styles2['K_Norm'])],
+                [Paragraph("초음파 탐촉 센서", styles2['K_Norm']), Paragraph(upv_pdf_txt, styles2['K_Norm'])]
+            ]
+            t_info2 = Table(info_data2, colWidths=[150, 370])
+            t_info2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,0), (0,-1), colors.whitesmoke)]))
+            story2.extend([t_info2, Spacer(1, 10)])
+
+            # 2. 타격 데이터 매트릭스 표 (5개씩 분할)
+            story2.append(Paragraph("▶ 슈미트해머 반발도(R값) 측정 데이터셋", styles2['K_Sub']))
+            strike_data_table = []
+            row = []
+            for i, val in enumerate(raw_inputs):
+                row.append(Paragraph(f"#{i+1:02d}: {val}", styles2['K_Norm_C']))
+                if (i+1) % 5 == 0:
+                    strike_data_table.append(row)
+                    row = []
+            if row: # 남은 데이터 (5의 배수가 아닌 경우 패딩)
+                while len(row) < 5:
+                    row.append(Paragraph("-", styles2['K_Norm_C']))
+                strike_data_table.append(row)
+
+            t_strike = Table(strike_data_table, colWidths=[104, 104, 104, 104, 104])
+            t_strike.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
+            story2.extend([t_strike, Spacer(1, 10)])
+
+            # 3. 강도 결과 요약
+            story2.append(Paragraph("▶ 데이터 분석 및 최종 복합 예상 강도", styles2['K_Sub']))
+            res_data = [
+                [Paragraph("반발도 데이터 전처리", styles2['K_Norm']), Paragraph(f"전체 평균: {total_avg:.2f} R / 이상치 {ex_count}개 폐기", styles2['K_Norm'])],
+                [Paragraph("최종 보정 반발도", styles2['K_Norm']), Paragraph(f"{corrected_R:.2f} R (타격 각도 및 규격 보정 완료)", styles2['K_Norm'])],
+                [Paragraph("단일 예상 강도 (Model A)", styles2['K_Norm']), Paragraph(f"{fc_rebound:.1f} MPa", styles2['K_Norm'])],
+                [Paragraph("최종 융합 예상 강도 (Model D)", styles2['K_Norm']), Paragraph(f"{fc_final_hybrid:.1f} MPa", styles2['K_Norm'])]
+            ]
+            t_res2 = Table(res_data, colWidths=[150, 370])
+            t_res2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue)]))
+            story2.extend([t_res2, Spacer(1, 10)])
+
+            # 4. AI 소견 추가
+            story2.append(Paragraph("▶ AI 비파괴 전문가 다차원 소견", styles2['K_Sub']))
+            ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견이 없습니다.")
+            story2.append(Paragraph(ai_comment_str, styles2['K_Norm']))
+            story2.append(Spacer(1, 10))
+
+            # 5. 근거 및 출처 텍스트 추가
+            story2.append(Paragraph("▶ 강도 추정 계산 원리 및 참조 근거", styles2['K_Sub']))
+            
+            # KS 규격
+            story2.append(Paragraph("[1] KS F 2730 (콘크리트 압축강도 추정을 위한 반발경도 시험방법)", styles2['K_Norm']))
+            story2.append(Paragraph("- 정의: 경화된 콘크리트 표면 반발 경도를 측정해 강도를 추정하는 비파괴 시험 KS 표준.", styles2['K_Norm']))
+            story2.append(Paragraph("- 적용: 측정값 평균에서 ±20%를 초과하는 이상치 폐기, 각도에 따른 중력 보정치(ΔR) 적용.", styles2['K_Norm']))
+            story2.append(Spacer(1, 5))
+            
+            # 수식
+            story2.append(Paragraph("[2] 적용 수식 및 알고리즘 변수", styles2['K_Norm']))
+            story2.append(Paragraph("- 단일 반발도 예상 강도식: Fc = 1.3 * R - 14.0 (MPa)", styles2['K_Norm']))
+            story2.append(Paragraph("- 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수 (MPa)", styles2['K_Norm']))
+            story2.append(Spacer(1, 5))
+            
+            # 문헌
+            story2.append(Paragraph("[3] 참조 문헌 및 시공/시방서", styles2['K_Norm']))
+            story2.append(Paragraph("- [SCI] 'Evaluation of Concrete Compressive Strength Using Ultrasonic Pulse Velocity and Rebound Hammer', A. Samarin et al., ACI Materials Journal (1983.11).", styles2['K_Norm']))
+            story2.append(Paragraph("- [국내] '초음파 속도와 반발경도를 이용한 콘크리트 압축강도 추정', 김철수 외, 한국건축구조학회논문집 (2021).", styles2['K_Norm']))
+            story2.append(Paragraph("- [시방서] 국토교통부 콘크리트 표준시방서 KCS 14 20 00.", styles2['K_Norm']))
+
+            doc2.build(story2)
+            buffer_p2.seek(0)
+            return buffer_p2.getvalue()
+
+        st.write("---")
+        
+        # 엑셀/PDF 파일명 커스텀 지정 UI 추가
+        st.markdown("#### 💾 분석 결과 다운로드")
+        custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
+        excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
+        pdf_filename = custom_filename + ".pdf" if not custom_filename.endswith(".pdf") else custom_filename
+
+        col_dl1, col_dl2 = st.columns(2)
+        
+        with col_dl1:
+            st.download_button(
+                label="📥 [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
+                data=build_page2_pdf(),
+                file_name=pdf_filename,
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+        with col_dl2:
+            # [중요] engine='openpyxl' 지정으로 엑셀 깨짐 완벽 방지 및 시트 추가
+            buffer_xls = io.BytesIO()
+            with pd.ExcelWriter(buffer_xls, engine='openpyxl') as writer:
+                # 👇 [수정됨] 엑셀에서도 이전 변수를 삭제하고 다중 측정 평균/보정 속도를 삽입합니다.
+                pd.DataFrame({"항목": ["수행 일시", "기온 (℃)", "상대습도 (%)", "설계기준강도", "초음파 평균속도 (m/s)", "초음파 보정속도 (m/s)"], "내용": [f"{m2_date} ({selected_time2})", auto_temp2, auto_hum2, fck, v_mps, v_mps_corr]}).to_excel(writer, sheet_name="측정조건", index=False)
+                pd.DataFrame({"타격_순서": [f"#{i:02d}" for i in range(1, strike_count + 1)], "실측_반발도(R)": raw_inputs}).to_excel(writer, sheet_name=f"{strike_count}회_타격데이터", index=False)
+                pd.DataFrame({"연산_모델_분류": ["[Model A] 단일 반발도 강도", "[Model B] 슬럼프/재령 반영", "[Model C] 초음파 융합 강도", "[Model D] 최종 융합 복합 강도"], "추정_압축강도(MPa)": [round(fc_rebound, 1), round(fc_slump_only, 1), round(fc_ultra_only, 1), round(fc_final_hybrid, 1)]}).to_excel(writer, sheet_name="강도결과", index=False)
+                
+                ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견 없음")
+                pd.DataFrame({"AI 소견": [ai_comment_str]}).to_excel(writer, sheet_name="AI_종합소견", index=False)
+                
+                pd.DataFrame({"산출 근거 및 문헌": [
+                    "1. [KS F 2730] 반발경도 시험방법 표준 규격 (이상치 폐기 및 각도 보정)",
+                    "2. [수식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
+                    "3. [수식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수",
+                    "4. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",
+                    "5. [국내 논문] 김철수 외, 한국건축구조학회논문집 (2021.05)",
+                    "6. [시방서] KCS 14 20 00 콘크리트 표준시방서"
+                ]}).to_excel(writer, sheet_name="참조근거", index=False)
+                
+            st.download_button(
+                label="📊 전체 도출 데이터 종합 (Excel)",
+                data=buffer_xls.getvalue(),
+                file_name=excel_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )

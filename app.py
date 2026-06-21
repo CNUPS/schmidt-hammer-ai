@@ -3,6 +3,25 @@ import cv2
 import numpy as np
 from PIL import Image as PILImage
 import datetime
+#============
+def make_time_options_korean():
+    """시간 선택을 위한 24시간 리스트를 생성하는 함수"""
+    options = []
+    for h in range(24):
+        options.append(f"{h:02d}시 00분")
+        options.append(f"{h:02d}시 30분")
+    return options
+
+def parse_korean_time(time_str):
+    """한글 시간 문자열('14시 00분')을 숫자 시, 분으로 변환하는 함수"""
+    try:
+        h = int(time_str.split("시")[0].strip())
+        m = int(time_str.split("시")[1].replace("분", "").strip())
+        return h, m
+    except Exception:
+        return 14, 0
+#=======
+
 import math
 import hashlib
 import requests
@@ -288,17 +307,13 @@ if "1." in main_menu:
     
     st.subheader("📋 현장 기본 정보 입력")
     c_hdr1, c_hdr2, c_hdr3, c_hdr4 = st.columns(4)
-    with c_hdr1: m_date = st.date_input("측정 실시 날짜", datetime.date.today())
-    with c_hdr2:
-        opts = [f"{h:02d}시 {m:02d}분" for h in range(24) for m in [0, 30]]
-        selected_time = st.selectbox("측정 시간", opts, index=opts.index("14시 00분"))
+    with c_hdr1: 
+        m_date = st.date_input("측정 실시 날짜", datetime.date.today())
         
-        # 들여쓰기를 with문 안쪽으로 맞추고 중괄호 오타를 수정했습니다
-        try:
-            m_hour = int(selected_time.split("시")[0].strip())
-            m_min = int(selected_time.split("시")[1].replace("분", "").strip())
-        except Exception:
-            m_hour, m_min = 14, 0  # 기본 선택이 14시이므로 에러 시 기본값도 14시로 세팅
+    with c_hdr2:
+        opts = make_time_options_korean()
+        selected_time = st.selectbox("측정 시간", opts, index=opts.index("14시 00분"))
+        m_hour, m_min = parse_korean_time(selected_time)
     with c_hdr3: m_loc = st.text_input("측정 위치", value="서울시 마포구 신축 현장")
     with c_hdr4: 
         # 타격 횟수 추천 로직 (+알파)

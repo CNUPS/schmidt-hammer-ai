@@ -242,13 +242,46 @@ def generate_gemini_commentary(page_type, data_dict):
                 f"*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
             )
 
-    try: 
-        # 👇 관리자님이 찾아주신 최신 무료 고성능 모델로 변경했습니다!
-        model = genai.GenerativeModel("gemini-3.1-flash-lite") 
-        res = model.generate_content(prompt) 
-        if res.text: return res.text.strip() + "\n\n*(Gemini Real-time AI 실시간 전문가 종합 분석 완료)*" 
-    except Exception as e: 
-        return f"🚨 Gemini API 에러 발생: {str(e)}\n\n💡 팁: Streamlit Secrets에 등록된 GEMINI_API 키가 올바른지 확인해 주세요!"
+    try:
+        # 1. Streamlit Secrets에서 저장해둔 Groq API 키를 자동으로 가져옵니다.
+        groq_key = st.secrets["GROQ_API_KEY"]
+        
+        # 2. Groq API 호출 주소 및 헤더 설정
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # 3. Llama 3.1 무료 고성능 모델 설정 및 프롬프트 주입
+        # (💡 중요: prompt 대신 기존 코드의 prompt_text 변수를 매핑했습니다)
+        data = {
+            "model": "llama-3.1-8b-instant",  # 100% 무료 고성능 모델
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "당신은 건축구조물 안전진단 및 콘크리트 품질검사 전문가입니다. 주어지는 데이터를 한국어로 건설 시방서 양식에 맞게 전문적이고 간결하게 분석해 주세요."
+                },
+                {"role": "user", "content": prompt_text} 
+            ],
+            "temperature": 0.3
+        }
+        
+        # 4. API 서버로 데이터 요청 전송
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        
+        # 5. 성공적으로 답변을 받았을 때의 처리
+        if response.status_code == 200:
+            result = response.json()
+            ai_text = result["choices"][0]["message"]["content"]
+            return ai_text.strip() + "\n\n*(Groq Llama-3.1 Real-time AI 실시간 전문가 종합 분석 완료)*"
+        else:
+            return f"🚨 Groq API 오류 발생 (코드: {response.status_code})\n\n💡 팁: Streamlit Secrets에 GROQ_API_KEY가 올바르게 등록되었는지 확인해 주세요!"
+            
+    except KeyError:
+        return "🚨 에러: Streamlit Secrets에 'GROQ_API_KEY' 이름이 정확하게 등록되지 않았습니다."
+    except Exception as e:
+        return f"🚨 통신 에러 발생: {str(e)}"
 
 def reliability_pct_calc(est, fck):
     if fck == 0: return 0.0
@@ -268,6 +301,48 @@ def make_time_options_korean():
 def parse_korean_time(time_text):
     return int(time_text.split("시")[0]), int(time_text.split("시")[1].replace("분", "").strip())
 
+====================================================
+#Groq 코드?
+def ask_groq_ai(prompt_text):
+    """
+    Streamlit Secrets에 등록된 GROQ_API_KEY를 사용하여
+    Llama 3.1 모델로부터 전문가 소견을 받아오는 함수
+    """
+    try:
+        # Secrets에서 키 가져오기 (만약 Secrets에 이름을 다르게 적으셨다면 그 이름으로 바꿔주세요)
+        groq_key = st.secrets["GROQ_API_KEY"]
+        
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "llama-3.1-8b-instant",  # 속도가 빠르고 성능이 좋은 무료 모델
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "당신은 건축구조물 안전진단 및 콘크리트 품질검사 전문가입니다. 주어지는 데이터를 한국어로 건설 시방서 양식에 맞게 전문적이고 간결하게 분석해 주세요."
+                },
+                {"role": "user", "content": prompt_text}
+            ],
+            "temperature": 0.3
+        }
+        
+        # API 호출
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+        else:
+            return f"Groq API 오류 발생 (코드: {response.status_code})"
+            
+    except KeyError:
+        return "에러: Streamlit Secrets에 'GROQ_API_KEY'가 등록되지 않았습니다."
+    except Exception as e:
+        return f"Groq 통신 에러 발생: {str(e)}"
 
 # =========================================================================
 # ⚙ 사이드바 메인 탭 제어 (누락 복구 구역)
@@ -489,11 +564,11 @@ if "1." in main_menu:
             story1 = []
             story1.append(Paragraph("[제 1페이지] AI 표면 품질 검사보고서", styles1['K_Title']))
             
-            # 👇 [수정됨] AI 연동 상태 상세 텍스트에 사이트 주소를 추가했습니다.
+            # --- AI 연동 상태 상세 텍스트 ---
             ai_status_detail = (
-                f"1. 컴퓨터 비전 (Roboflow - https://roboflow.com): {'연결 성공 (Live)' if is_roboflow_live else '내장 시뮬레이션 동작'}<br/>"
-                "2. 기상청 API (공공데이터포털 - https://data.go.kr): 정상 연동<br/>"
-                "3. 대형언어모델 (Google Gemini - https://ai.google.dev): 정상 연동"
+                f"1. 컴퓨터 비전 (Roboflow): {'연결 성공 (Live)' if is_roboflow_live else '내장 시뮬레이션 동작'}<br/>"
+                "2. 기상 데이터 (OpenAPI): 정상 연동<br/>"
+                "3. 대형언어모델 (Gemini): 정상 연동"
             )
             current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -518,7 +593,9 @@ if "1." in main_menu:
             story1.extend([t_img1, Spacer(1, 15)])
             
             story1.append(Paragraph("[자체 빅데이터 AI 종합 요약 분석 의견]", styles1['K_Sub']))
-            story1.append(Paragraph(ai_summary_txt, styles1['K_Norm']))
+            # 👇 Groq의 줄바꿈(\n)을 PDF용 줄바꿈(<br/>)으로 바꿔줍니다.
+            pdf_summary = ai_summary_txt.replace('\n', '<br/>') if ai_summary_txt else "AI 분석 내용 없음"
+            story1.append(Paragraph(pdf_summary, styles1['K_Norm']))
             
             doc1.build(story1)
             buffer_p1.seek(0)
@@ -769,7 +846,14 @@ elif "2." in main_menu:
         t_res2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue)]))
         story2.extend([t_res2, Spacer(1, 10)])
 
-        # 5. 근거 및 출처 텍스트 추가 (초음파 공식 추가됨)
+        # 👇 AI 소견 추가 (줄바꿈 <br/> 처리 적용)
+        story2.append(Paragraph("▶ AI 비파괴 전문가 다차원 소견", styles2['K_Sub']))
+        ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견이 없습니다.")
+        pdf_comment2 = ai_comment_str.replace('\n', '<br/>')
+        story2.append(Paragraph(pdf_comment2, styles2['K_Norm']))
+        story2.append(Spacer(1, 10))
+
+        # 5. 근거 및 출처 텍스트 추가
         story2.append(Paragraph("▶ 강도 추정 계산 원리 및 참조 근거", styles2['K_Sub']))
         
         story2.append(Paragraph("[1] 초음파(UPV) 측정법 및 산출식", styles2['K_Norm']))

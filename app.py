@@ -292,7 +292,13 @@ if "1." in main_menu:
     with c_hdr2:
         opts = [f"{h:02d}시 {m:02d}분" for h in range(24) for m in [0, 30]]
         selected_time = st.selectbox("측정 시간", opts, index=opts.index("14시 00분"))
-        m_hour, m_min = parse_korean_time(selected_time)
+        
+        # 들여쓰기를 with문 안쪽으로 맞추고 중괄호 오타를 수정했습니다
+        try:
+            m_hour = int(selected_time.split("시")[0].strip())
+            m_min = int(selected_time.split("시")[1].replace("분", "").strip())
+        except Exception:
+            m_hour, m_min = 14, 0  # 기본 선택이 14시이므로 에러 시 기본값도 14시로 세팅
     with c_hdr3: m_loc = st.text_input("측정 위치", value="서울시 마포구 신축 현장")
     with c_hdr4: 
         # 타격 횟수 추천 로직 (+알파)

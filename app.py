@@ -489,11 +489,11 @@ if "1." in main_menu:
             story1 = []
             story1.append(Paragraph("[제 1페이지] AI 표면 품질 검사보고서", styles1['K_Title']))
             
-            # --- AI 연동 상태 상세 텍스트 ---
+            # 👇 [수정됨] AI 연동 상태 상세 텍스트에 사이트 주소를 추가했습니다.
             ai_status_detail = (
-                f"1. 컴퓨터 비전 (Roboflow): {'연결 성공 (Live)' if is_roboflow_live else '내장 시뮬레이션 동작'}<br/>"
-                "2. 기상 데이터 (OpenAPI): 정상 연동<br/>"
-                "3. 대형언어모델 (Gemini): 정상 연동"
+                f"1. 컴퓨터 비전 (Roboflow - https://roboflow.com): {'연결 성공 (Live)' if is_roboflow_live else '내장 시뮬레이션 동작'}<br/>"
+                "2. 기상청 API (공공데이터포털 - https://data.go.kr): 정상 연동<br/>"
+                "3. 대형언어모델 (Google Gemini - https://ai.google.dev): 정상 연동"
             )
             current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 

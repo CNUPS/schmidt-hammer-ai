@@ -565,6 +565,9 @@ elif "2." in main_menu:
         
         v_mps = 0.0         # 전체 평균 속도
         v_mps_corr = 0.0    # 10% 이상치 제외 보정 평균 속도
+        upv_detail_data = [] # 엑셀/PDF용 상세 데이터 저장 리스트
+        upv_method = "미사용"
+        upv_count = 0
         
         if use_ultra:
             upv_cols1, upv_cols2 = st.columns(2)
@@ -577,7 +580,6 @@ elif "2." in main_menu:
                     
             with upv_cols2:
                 upv_method = st.radio("전체 초음파 측정 방법", ["직접법", "간접법"], horizontal=True)
-                # 간접법은 직접법 대비 에너지가 약해 속도가 느리므로 보정계수(1.05배) 적용
                 method_factor = 1.0 if upv_method == "직접법" else 1.05 
             
             st.markdown("##### 📝 초음파 측정 데이터 입력")
@@ -585,8 +587,6 @@ elif "2." in main_menu:
             for i in range(upv_count):
                 c1, c2, c3 = st.columns([1, 2, 2])
                 c1.markdown(f"<br/>**#{i+1}**", unsafe_allow_html=True)
-                
-                # 👇 아래쪽에 라벨 이름(프로브 거리, 측정 시간)을 정확히 적어주면 칸 바로 위에 표시됩니다!
                 dist = c2.number_input(f"프로브 거리 (mm)", min_value=10.0, value=300.0, step=10.0, key=f"u_dist_{i}")
                 time_us = c3.number_input(f"측정 시간 (μs)", min_value=1.0, value=80.0, step=1.0, key=f"u_time_{i}")
                 
@@ -594,9 +594,17 @@ elif "2." in main_menu:
                 vel = (dist / time_us) * 1000 * method_factor if time_us > 0 else 0
                 upv_velocities.append(vel)
                 
+                # 상세 데이터 리스트에 저장
+                upv_detail_data.append({
+                    "측정_순서": f"#{i+1:02d}", 
+                    "측정방법": upv_method,
+                    "프로브거리(mm)": dist, 
+                    "측정시간(μs)": time_us, 
+                    "환산속도(m/s)": round(vel, 1)
+                })
+                
             if upv_velocities:
                 v_mps = sum(upv_velocities) / len(upv_velocities)
-                # 상하위 10% 제외 보정 로직 (데이터가 3개 이상일 때)
                 if len(upv_velocities) >= 3:
                     sorted_v = sorted(upv_velocities)
                     exclude_cnt = max(1, int(len(upv_velocities) * 0.1))
@@ -624,7 +632,6 @@ elif "2." in main_menu:
             selected_angle_str = st.selectbox("🎯 타격 각도", angle_opts, index=18)
             angle_val = int(selected_angle_str.split("°")[0])
 
-        # 동적 R값 5개씩 줄바꿈
         raw_inputs = []
         c_r1, c_r2, c_r3, c_r4, c_r5 = st.columns(5)
         cols = [c_r1, c_r2, c_r3, c_r4, c_r5]
@@ -640,31 +647,25 @@ elif "2." in main_menu:
     raw_arr = np.array(raw_inputs, dtype=float)
     total_avg = np.mean(raw_arr)
 
-    # KS F 2730 이상치 제거 (±20% 규격)
     lower, upper = total_avg * 0.80, total_avg * 1.20
     filtered_data = [v for v in raw_arr if lower <= v <= upper]
     ex_count = len(raw_arr) - len(filtered_data)
     ks_avg = np.mean(filtered_data) if filtered_data else total_avg
 
-    # 타격 각도 보정
     delta_R = calculate_angle_correction(ks_avg, angle_val)
     corrected_R = ks_avg + delta_R
 
-    # Model A: 단일 반발도 강도 (대한건축학회)
     fc_rebound = max(0.0, 1.3 * corrected_R - 14.0)
 
-    # 환경 보정 계수
     age_factor = max(0.82, 1.0 - 0.03 * math.log(total_days / 28.0)) if total_days > 28 else 1.0
     env_factor = 1.06 if auto_hum2 >= 80.0 else 0.93 if (auto_temp2 < 5.0 or auto_temp2 > 35.0) else 1.0
     slump_corr = max(0.80, 1.0 - 0.0008 * (val_slump - 150)) if (use_slump and val_slump > 150) else 1.0
 
-    # Model C: 초음파 단독 추정 강도
     if use_ultra and v_mps_corr > 0:
         fc_ultra_only = max(0.0, 0.015 * v_mps_corr - 36.0)
     else:
         fc_ultra_only = 0.0
 
-    # Model D: 최종 복합 (SCI 논문 SonReb 기반)
     if use_ultra and v_mps_corr > 0:
         v_kmps_corr = v_mps_corr / 1000.0
         base_hybrid = 0.05 * (corrected_R ** 1.2) * (v_kmps_corr ** 1.5)
@@ -683,57 +684,6 @@ elif "2." in main_menu:
     col_fc2.info(f"**[Model C] 초음파(10%보정) 강도:**\n### {fc_ultra_only:.1f} MPa" if use_ultra else "**[Model C] 초음파 미연동**")
     col_fc3.success(f"**🏆 [Model D] 통합 복합 예상강도:**\n### {fc_final_hybrid:.1f} MPa")
 
-    st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 2 다차원 분석)")
-    
-    # 2페이지용 상세 측정 데이터를 딕셔너리로 취합하여 Gemini 연동
-    page2_data = {
-        "location": m2_loc,
-        "date": str(m2_date),
-        "temp": auto_temp2,
-        "hum": auto_hum2,
-        "age": total_days,
-        "fck": fck,
-        "corrected_R": corrected_R,
-        "v_mps": v_mps,
-        "slump": val_slump,
-        "est_strength": fc_final_hybrid,
-        "ex_count": ex_count
-    }
-    
-    ai_comment = generate_gemini_commentary(2, page2_data)
-    st.info(ai_comment)
-
-    st.markdown("---")
-    # =========================================================================
-    # 📚 산출 근거 및 출처 (UI)
-    # =========================================================================
-    st.markdown("""
-    ### 📚 [강도 추정 계산 원리 및 참조 근거]
-    
-    **1. KS 규격 (KS F 2730: 콘크리트 압축강도 추정을 위한 반발경도 시험방법)**
-    - **정의**: 경화된 콘크리트 표면을 슈미트 해머로 타격하여 측정한 반발 경도를 통해 강도를 추정하는 국가 표준 비파괴 시험법입니다.
-    - **적용**: 본 시스템은 표준 규격에 의거하여 평균치 대비 **±20%를 초과하는 측정값을 이상치로 간주하여 폐기**하고, 타격 방향(중력 작용선)에 따른 **반발도 보정 계수($\Delta R$)**를 연속적으로 적용합니다.
-
-    **2. 사용된 추정 수식 및 변수**
-    - **단일 반발도 추정식 (대한건축학회)**: 표면 경도 기반의 1차 추정
-    """)
-    st.latex(r"F_c = 1.3 \times R_{c} - 14.0 \quad \text{(MPa)}")
-    st.markdown("""
-    - **다중 복합 강도 추정식 (SonReb Method)**: 반발경도($R_c$)와 초음파 전파속도($V$)를 융합하여 표면 강도의 한계와 내부 밀실도를 상호 보완
-    """)
-    st.latex(r"F_c = 0.05 \times (R_{c})^{1.2} \times (V)^{1.5} \times \alpha \times \beta \quad \text{(MPa)}")
-    st.markdown("""
-    *(여기서 $R_c$: 보정 반발도, $V$: 초음파 속도(km/s), $\alpha$: 재령 보정 계수, $\beta$: 환경 및 슬럼프 보정 계수)*
-
-    **3. 참조 논문 및 시공/시방서 출처**
-    - **[SCI 논문]**: "Evaluation of Concrete Compressive Strength Using Ultrasonic Pulse Velocity and Rebound Hammer", A. Samarin et al., *ACI Materials Journal* (1983.11).
-    - **[국내 논문]**: "초음파 속도와 반발경도를 이용한 콘크리트 압축강도 추정식 제안", 김철수 외, *한국건축구조학회논문집* (2021.05).
-    - **[시방서/시공서]**: 국토교통부 콘크리트 표준시방서 - KCS 14 20 00 (비파괴 시험에 의한 구조물 검사 기준 준용).
-    """)
-
-    # =========================================================================
-    # 🖨 2페이지 완전체 PDF 빌더 (Bold 태그 제거, 포맷 완전 안정화)
-    # =========================================================================
     def build_page2_pdf():
         buffer_p2 = io.BytesIO()
         doc2 = SimpleDocTemplate(buffer_p2, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -744,11 +694,13 @@ elif "2." in main_menu:
             styles2.add(ParagraphStyle(name='K_Sub', fontName=pdf_font, fontSize=11, leading=16, spaceBefore=10, spaceAfter=5, textColor=colors.HexColor("#2B6CB0")))
             styles2.add(ParagraphStyle(name='K_Norm', fontName=pdf_font, fontSize=9, leading=14))
             styles2.add(ParagraphStyle(name='K_Norm_C', fontName=pdf_font, fontSize=9, leading=14, alignment=1))
+            styles2.add(ParagraphStyle(name='K_Head', fontName=pdf_font, fontSize=9, leading=14, textColor=colors.white, alignment=1))
         else:
             styles2.add(ParagraphStyle(name='K_Title', fontName='Helvetica', fontSize=16, alignment=1))
             styles2.add(ParagraphStyle(name='K_Sub', fontName='Helvetica', fontSize=11))
             styles2.add(ParagraphStyle(name='K_Norm', fontName='Helvetica', fontSize=9))
             styles2.add(ParagraphStyle(name='K_Norm_C', fontName='Helvetica', fontSize=9, alignment=1))
+            styles2.add(ParagraphStyle(name='K_Head', fontName='Helvetica', fontSize=9, textColor=colors.white, alignment=1))
 
         story2 = []
         
@@ -756,8 +708,7 @@ elif "2." in main_menu:
         
         # 1. 현장 정보 표
         story2.append(Paragraph("▶ 진단 수행 정보 및 파라미터", styles2['K_Sub']))
-        
-        upv_pdf_txt = f"평균: {v_mps:.1f} m/s / 보정: {v_mps_corr:.1f} m/s ({upv_count}회 측정)" if use_ultra and v_mps_corr > 0 else "미사용"
+        upv_pdf_txt = f"평균: {v_mps:.1f} m/s / 보정: {v_mps_corr:.1f} m/s ({upv_count}회 {upv_method})" if use_ultra and v_mps_corr > 0 else "미사용"
         
         info_data2 = [
             [Paragraph("측정 일시 및 장소", styles2['K_Norm']), Paragraph(f"{m2_date} ({selected_time2}) / {m2_loc}", styles2['K_Norm'])],
@@ -769,7 +720,26 @@ elif "2." in main_menu:
         t_info2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,0), (0,-1), colors.whitesmoke)]))
         story2.extend([t_info2, Spacer(1, 10)])
 
-        # 2. 타격 데이터 매트릭스 표 (5개씩 분할)
+        # 2. 초음파 측정 상세 표 (초음파 사용 시에만 추가됨)
+        if use_ultra and upv_detail_data:
+            story2.append(Paragraph(f"▶ 초음파(UPV) 측정 데이터셋 ({upv_method})", styles2['K_Sub']))
+            upv_table_data = [[Paragraph("측정 순서", styles2['K_Head']), Paragraph("프로브 거리", styles2['K_Head']), Paragraph("주행 시간", styles2['K_Head']), Paragraph("환산 속도", styles2['K_Head'])]]
+            for row_data in upv_detail_data:
+                upv_table_data.append([
+                    Paragraph(row_data["측정_순서"], styles2['K_Norm_C']),
+                    Paragraph(f"{row_data['프로브거리(mm)']} mm", styles2['K_Norm_C']),
+                    Paragraph(f"{row_data['측정시간(μs)']} μs", styles2['K_Norm_C']),
+                    Paragraph(f"{row_data['환산속도(m/s)']} m/s", styles2['K_Norm_C'])
+                ])
+            t_upv = Table(upv_table_data, colWidths=[80, 110, 110, 110])
+            t_upv.setStyle(TableStyle([
+                ('FONTNAME', (0,0), (-1,-1), pdf_font), 
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey), 
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2B6CB0"))
+            ]))
+            story2.extend([t_upv, Spacer(1, 10)])
+
+        # 3. 반발도 데이터 매트릭스 표 (5개씩 분할)
         story2.append(Paragraph("▶ 슈미트해머 반발도(R값) 측정 데이터셋", styles2['K_Sub']))
         strike_data_table = []
         row = []
@@ -787,7 +757,7 @@ elif "2." in main_menu:
         t_strike.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
         story2.extend([t_strike, Spacer(1, 10)])
 
-        # 3. 강도 결과 요약
+        # 4. 강도 결과 요약
         story2.append(Paragraph("▶ 데이터 분석 및 최종 복합 예상 강도", styles2['K_Sub']))
         res_data = [
             [Paragraph("반발도 데이터 전처리", styles2['K_Norm']), Paragraph(f"전체 평균: {total_avg:.2f} R / 이상치 {ex_count}개 폐기", styles2['K_Norm'])],
@@ -799,29 +769,24 @@ elif "2." in main_menu:
         t_res2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue)]))
         story2.extend([t_res2, Spacer(1, 10)])
 
-        # 4. AI 소견 추가
-        story2.append(Paragraph("▶ AI 비파괴 전문가 다차원 소견", styles2['K_Sub']))
-        ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견이 없습니다.")
-        story2.append(Paragraph(ai_comment_str, styles2['K_Norm']))
-        story2.append(Spacer(1, 10))
-
-        # 5. 근거 및 출처 텍스트 추가
+        # 5. 근거 및 출처 텍스트 추가 (초음파 공식 추가됨)
         story2.append(Paragraph("▶ 강도 추정 계산 원리 및 참조 근거", styles2['K_Sub']))
         
-        story2.append(Paragraph("[1] KS F 2730 (콘크리트 압축강도 추정을 위한 반발경도 시험방법)", styles2['K_Norm']))
-        story2.append(Paragraph("- 정의: 경화된 콘크리트 표면 반발 경도를 측정해 강도를 추정하는 비파괴 시험 KS 표준.", styles2['K_Norm']))
-        story2.append(Paragraph("- 적용: 측정값 평균에서 ±20%를 초과하는 이상치 폐기, 각도에 따른 중력 보정치(ΔR) 적용.", styles2['K_Norm']))
+        story2.append(Paragraph("[1] 초음파(UPV) 측정법 및 산출식", styles2['K_Norm']))
+        story2.append(Paragraph("- 직접법(Direct Method): 마주보는 면에서 측정. 환산 속도(m/s) = (프로브 거리 / 측정 시간) × 1000", styles2['K_Norm']))
+        story2.append(Paragraph("- 간접법(Indirect Method): 같은 면에서 측정. 에너지 감쇠 보상을 위해 산출된 속도에 1.05배 보정계수 적용.", styles2['K_Norm']))
+        story2.append(Spacer(1, 5))
+
+        story2.append(Paragraph("[2] 강도 융합(SonReb) 알고리즘", styles2['K_Norm']))
+        story2.append(Paragraph("- 단일 반발도 추정식: Fc = 1.3 × R - 14.0 (MPa)", styles2['K_Norm']))
+        story2.append(Paragraph("- 다차원 복합 강도식: Fc = 0.05 × R^1.2 × V^1.5 × 보정계수 (MPa)", styles2['K_Norm']))
         story2.append(Spacer(1, 5))
         
-        story2.append(Paragraph("[2] 적용 수식 및 알고리즘 변수", styles2['K_Norm']))
-        story2.append(Paragraph("- 단일 반발도 예상 강도식: Fc = 1.3 * R - 14.0 (MPa)", styles2['K_Norm']))
-        story2.append(Paragraph("- 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수 (MPa)", styles2['K_Norm']))
-        story2.append(Spacer(1, 5))
-        
-        story2.append(Paragraph("[3] 참조 문헌 및 시공/시방서", styles2['K_Norm']))
-        story2.append(Paragraph("- [SCI] 'Evaluation of Concrete Compressive Strength Using Ultrasonic Pulse Velocity and Rebound Hammer', A. Samarin et al., ACI Materials Journal (1983.11).", styles2['K_Norm']))
-        story2.append(Paragraph("- [국내] '초음파 속도와 반발경도를 이용한 콘크리트 압축강도 추정', 김철수 외, 한국건축구조학회논문집 (2021).", styles2['K_Norm']))
-        story2.append(Paragraph("- [시방서] 국토교통부 콘크리트 표준시방서 KCS 14 20 00.", styles2['K_Norm']))
+        story2.append(Paragraph("[3] KS 표준 및 국내외 참조 문헌", styles2['K_Norm']))
+        story2.append(Paragraph("- [KS 표준] KS F 2730 (반발경도 시험), KS F 2731 (초음파 전달 속도 측정)", styles2['K_Norm']))
+        story2.append(Paragraph("- [국가건설기준] KCS 14 20 00 콘크리트 표준시방서", styles2['K_Norm']))
+        story2.append(Paragraph("- [SCI 논문] 'Evaluation of Concrete Compressive Strength Using UPV and Rebound Hammer', A. Samarin et al., ACI Materials Journal (1983)", styles2['K_Norm']))
+        story2.append(Paragraph("- [KCI 논문] '초음파 속도와 반발경도를 이용한 콘크리트 압축강도 추정', 김철수 외, 한국건축구조학회논문집 (2021)", styles2['K_Norm']))
 
         doc2.build(story2)
         buffer_p2.seek(0)
@@ -829,7 +794,6 @@ elif "2." in main_menu:
 
     st.write("---")
     
-    # 엑셀/PDF 파일명 커스텀 지정 UI 추가
     st.markdown("#### 💾 분석 결과 다운로드")
     custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
     excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
@@ -847,23 +811,30 @@ elif "2." in main_menu:
         )
 
     with col_dl2:
-        # [중요] engine='openpyxl' 지정으로 엑셀 깨짐 완벽 방지 및 시트 추가
         buffer_xls = io.BytesIO()
         with pd.ExcelWriter(buffer_xls, engine='openpyxl') as writer:
             pd.DataFrame({"항목": ["수행 일시", "기온 (℃)", "상대습도 (%)", "설계기준강도", "초음파 평균속도 (m/s)", "초음파 보정속도 (m/s)"], "내용": [f"{m2_date} ({selected_time2})", auto_temp2, auto_hum2, fck, v_mps, v_mps_corr]}).to_excel(writer, sheet_name="측정조건", index=False)
+            
+            # 👇 엑셀에 초음파 n회 데이터 전용 시트 추가
+            if use_ultra and upv_detail_data:
+                pd.DataFrame(upv_detail_data).to_excel(writer, sheet_name=f"{upv_count}회_초음파데이터", index=False)
+                
             pd.DataFrame({"타격_순서": [f"#{i:02d}" for i in range(1, strike_count + 1)], "실측_반발도(R)": raw_inputs}).to_excel(writer, sheet_name=f"{strike_count}회_타격데이터", index=False)
             pd.DataFrame({"연산_모델_분류": ["[Model A] 단일 반발도 강도", "[Model B] 슬럼프/재령 반영", "[Model C] 초음파 융합 강도", "[Model D] 최종 융합 복합 강도"], "추정_압축강도(MPa)": [round(fc_rebound, 1), round(fc_slump_only, 1), round(fc_ultra_only, 1), round(fc_final_hybrid, 1)]}).to_excel(writer, sheet_name="강도결과", index=False)
             
             ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견 없음")
             pd.DataFrame({"AI 소견": [ai_comment_str]}).to_excel(writer, sheet_name="AI_종합소견", index=False)
             
+            # 👇 엑셀용 산출 근거 및 문헌 업데이트
             pd.DataFrame({"산출 근거 및 문헌": [
-                "1. [KS F 2730] 반발경도 시험방법 표준 규격 (이상치 폐기 및 각도 보정)",
-                "2. [수식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
-                "3. [수식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수",
-                "4. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",
-                "5. [국내 논문] 김철수 외, 한국건축구조학회논문집 (2021.05)",
-                "6. [시방서] KCS 14 20 00 콘크리트 표준시방서"
+                "1. [측정식] 초음파 직접법(m/s) = (거리/시간)*1000",
+                "2. [측정식] 초음파 간접법(m/s) = (거리/시간)*1000 * 1.05 (에너지 감쇠 5% 보상)",
+                "3. [산출식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
+                "4. [산출식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 환경보정계수",
+                "5. [KS 규격] KS F 2730 (반발경도 이상치 폐기 및 중력보정), KS F 2731 (초음파 시험법)",
+                "6. [시방서] KCS 14 20 00 국토교통부 콘크리트 표준시방서",
+                "7. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",
+                "8. [KCI 논문] 김철수 외, 한국건축구조학회논문집 (2021.05)"
             ]}).to_excel(writer, sheet_name="참조근거", index=False)
             
         st.download_button(

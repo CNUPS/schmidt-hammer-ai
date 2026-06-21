@@ -290,7 +290,7 @@ if "1." in main_menu:
     c_hdr1, c_hdr2, c_hdr3, c_hdr4 = st.columns(4)
     with c_hdr1: m_date = st.date_input("측정 실시 날짜", datetime.date.today())
     with c_hdr2:
-        opts = make_time_options_korean()
+        opts = [f"{h:02d}시 {m:02d}분" for h in range(24) for m in [0, 30]]
         selected_time = st.selectbox("측정 시간", opts, index=opts.index("14시 00분"))
         m_hour, m_min = parse_korean_time(selected_time)
     with c_hdr3: m_loc = st.text_input("측정 위치", value="서울시 마포구 신축 현장")

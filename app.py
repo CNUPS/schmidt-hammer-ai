@@ -831,7 +831,7 @@ elif "2." in main_menu:
             buffer_p2.seek(0)
             return buffer_p2.getvalue()
 
-st.write("---")
+        st.write("---")
         
         # 엑셀/PDF 파일명 커스텀 지정 UI 추가
         st.markdown("#### 💾 분석 결과 다운로드")

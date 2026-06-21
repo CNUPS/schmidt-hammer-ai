@@ -301,7 +301,7 @@ def make_time_options_korean():
 def parse_korean_time(time_text):
     return int(time_text.split("시")[0]), int(time_text.split("시")[1].replace("분", "").strip())
 
-====================================================
+
 #Groq 코드?
 def ask_groq_ai(prompt_text):
     """

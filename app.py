@@ -168,17 +168,23 @@ def generate_gemini_commentary(page_type, data_dict):
     real_h_cm = data_dict.get("real_h_cm", 0.0)
     total_area_mm2 = data_dict.get("total_area_mm2", 0.0)
 
-    # 2페이지용 데이터 (슈미트 해머 강도 연산 결과)
+    # 2페이지용 데이터 (슈미트 해머 및 초음파 데이터 전체 추출)
     age = data_dict.get("age", 28) 
     fck = data_dict.get("fck", 24.0) 
     r_val = data_dict.get("corrected_R", 35.0) 
     v_upv = data_dict.get("v_mps", 0.0) 
     slump = data_dict.get("slump", 150) 
-    st_strength = data_dict.get("est_strength", 25.0)  # 아래 변수명 매핑을 위해 수정
-    est_strength = data_dict.get("est_hybrid", st_strength) # 유연한 키값 대응
+    st_strength = data_dict.get("est_strength", 25.0)
+    est_strength = data_dict.get("est_hybrid", st_strength)
     ex_count = data_dict.get("ex_count", 0) 
+    
+    # 💡 [요청 반영] 소견 고도화를 위한 실측 파라미터 추가 수집
+    strike_count = data_dict.get("strike_count", 20)
+    raw_inputs = data_dict.get("raw_inputs", "[]")
+    cast_date = data_dict.get("cast_date", "미지정")
+    fc_rebound = data_dict.get("fc_rebound", 0.0)
+    fc_ultra_only = data_dict.get("fc_ultra_only", 0.0)
 
-    # 💡 [버그 수정 1] page_type이 문자열이든 숫자든 정확히 걸러내도록 수정
     if str(page_type) in ["1", "page1"]: 
         prompt = f""" 
         당신은 대한민국 국토교통부 콘크리트 표준시방서(KCS 14 20 00) 및 KS F 2730 표준을 마스터한 최고의 '콘크리트 비파괴 안전성 진단 기술사'입니다. 
@@ -189,163 +195,84 @@ def generate_gemini_commentary(page_type, data_dict):
         - 기상청 실시간 연동 기후: 기온 {temp}℃ / 상대습도 {hum}% 
 
         [비전 스캔 AI 결함 분석 데이터] 
-        - 픽셀 캘리브레이션 기반 실제 사진 크기: 가로 {real_w_cm:.1f} cm x 세로 {real_h_cm:.1f} cm
-        - 실제 촬영된 총 벽면 면적: {total_area_mm2:.1f} mm²
-        - AI가 검출한 요철/불균질/균열 등 결함 영역 비율: 전체 사진 면적 대비 {defect_ratio:.2f}%
+        - 사진 크기: 가로 {real_w_cm:.1f} cm x 세로 {real_h_cm:.1f} cm (총 면적: {total_area_mm2:.1f} mm²)
+        - 결함 영역 비율: 전체 대비 {defect_ratio:.2f}%
 
         [작성 가이드라인] 
-        1. 기상 조건(온도/습도)이 당일 진단 작업 및 구조물 표면 건조 상태에 미치는 영향을 기술할 것. 
-        2. 제공된 사진의 실제 면적 크기와 결함 영역 비율({defect_ratio:.2f}%) 수치를 명확히 명시하며 벽면 상태가 양호한지 불량한지 정량적으로 평가할 것. 
-        3. 검출된 결함 비율을 토대로, 향후 슈미트 해머 타격 작업의 난이도와 예측되는 데이터의 신뢰성(값이 비교적 잘 나올지, 편차가 심할지 등)에 대한 기술사적 코멘트를 반드시 포함할 것. 
+        1. 기상 조건이 구조물 표면 건조 상태에 미치는 영향을 기술할 것. 
+        2. 제공된 결함 영역 비율({defect_ratio:.2f}%)을 토대로 벽면 상태를 정량적으로 평가할 것. 
+        3. 검출된 결함 비율이 향후 슈미트 해머 타격 작업 데이터의 신뢰성에 미치는 공학적 소견을 포함할 것. 
         4. 전문가 특유의 정량화된 기술 문체(~입니다, ~하며, ~로 판단됩니다)를 사용할 것.
         """ 
     else: 
+        # 💡 [요청 반영] 모든 계측 정보를 융합하도록 설계된 초호화 기술사 프롬프트
         prompt = f""" 
-        당신은 대한민국 국토교통부 콘크리트 표준시방서(KCS 14 20 00) 및 KS F 2730 표준을 마스터한 최고의 '콘크리트 비파괴 안전성 진단 기술사'입니다.
-        다음 현장 실측 조건 데이터를 기반으로 공식 제출 보고서에 즉시 기재할 수 있는 엄격하고 정밀한 종합 분석 소견을 한글 4문장 내외로 논리정연하게 작성하십시오.
+        당신은 대한민국 국토교통부 콘크리트 표준시방서(KCS 14 20 00) 및 KS F 2730 표준을 통달한 국내 최고 권위의 '콘크리트 구조안전진단 특급 기술사'입니다.
+        제공된 아래의 모든 정밀 계측 데이터셋을 완벽히 유기적으로 조합하여 보고서 소견란에 즉시 반영 가능한 수준의 정밀 종합 소견을 한글 4~5문장 내외로 서술하십시오.
         
-        [현장 물리 환경 데이터]
-        - 진단 현장 위치: {loc}
-        - 점검 수행 날짜: {date_val}
-        - 실시간 기상 상태: 기온 {temp}℃ / 상대습도 {hum}% (KS F 2730 기후 제한 조건 만족 여부 판단에 사용)
-        - 콘크리트 인자: 설계기준강도 {fck} MPa / 타설 후 경과 재령일수 {age}일
+        [정밀 진단 환경 및 물리 인자]
+        - 진단 대상 및 현장 위치: {loc}
+        - 계측 점검 일시: {date_val}
+        - 실시간 대기 기후 파라미터: 기온 {temp}℃ / 상대습도 {hum}%
+        - 배합 및 설계 조건: 설계기준강도(fck) {fck} MPa / 설계 슬럼프 {slump} mm
+        - 타설일({cast_date}) 기준 고도硬化 경과 재령수: {age}일
+        - 슈미트해머 표면 강도 계측: 총 타격 횟수 {strike_count}회 수행, 실측 전처리 반발도 리스트 {raw_inputs}, 동적 통계 기법 적용 후 이상치 {ex_count}개 자동 폐기 처리 및 최종 보정 평균 반발도 {r_val:.1f} R 산출
+        - 초음파 복합 심부 계측: 내부 공극 추적을 위한 초음파 전파 보정 속도 {v_upv:.1f} m/s 측정 완료
         
-        [슈미트 해머 강도 연산 실측 결과]
-        - 슈미트 해머 보정 평균 반발도(R값): {r_val:.1f} R (동적 이상치 {ex_count}개 제외 후 각도 보정 완료)
-        - 초음파(UPV) 센서 수신 전파속도: {v_upv:.1f} m/s (주행거리 대비 프로브 응답)
-        - 설계 슬럼프 변수: {slump} mm (공극 보정 계수 반영)
-        - 종합 복합 산출 강도: {est_strength:.1f} MPa
+        [비파괴 알고리즘 모델별 연산 강도]
+        1) [Model A] 표면 반발경도 단일 예상 강도: {fc_rebound:.1f} MPa
+        2) [Model C] 초음파 심부 속도 추정 강도: {fc_ultra_only:.1f} MPa
+        3) [Model D] 복합 알고리즘(SonReb) 최종 융합 예상 강도: {est_strength:.1f} MPa
         
-        [작성 가이드라인] 
-        1. 기술사 특유의 엄격하고 정량화된 전문 기술 문체(~입니다, ~하며, ~로 판단됩니다)를 고수하십시오.
-        2. 당일 온습도 기후 데이터가 KS F 2730 기준에 어떻게 부합하여 측정 정확도 향상에 기여했는지 서술하십시오.
-        3. 도출된 최종 예측 압축강도({est_strength:.1f} MPa)가 타설 설계강도({fck} MPa)를 완벽히 상회하여 충분한 안정성 마진을 유지하고 있는지 평가하십시오.
-        4. 표면 경도 측정의 고유 한계를 극복하기 위해 '초음파 전파 주행속도({v_upv:.1f} m/s)' 및 '슬럼프 변동 제어' 융합 모델(SonReb)을 통해 어떻게 내부 결함 및 공극 왜곡 요소를 보정하고 정밀화했는지 학술적 논리로 강조해 주십시오.
+        [기술사 소견 필수 포함 지침]
+        1. 정량화된 특급 엔지니어 전용 문체(~입니다, ~하며, ~로 판단됩니다, ~를 확인하였습니다)만을 엄격히 고수하십시오.
+        2. 계측 당시의 온습도 환경이 KS F 2730 표준 규격 제한조건을 만족하여 데이터의 물리적 왜곡을 제어했음을 밝혀주십시오.
+        3. 도출된 최종 복합 강도({est_strength:.1f} MPa)를 설계강도({fck} MPa) 및 경과재령({age}일)과 공학적으로 정밀 비교하여 구조적 강도 마진의 충분성을 판정하십시오.
+        4. 표면 경도의 탄산화 한계를 극복하기 위해, 심부 조밀도를 진단하는 초음파 속도({v_upv:.1f} m/s)와 슬럼프 인자를 복합 연산한 Model D(SonReb 융합모델)가 단일 측정법 대비 진단 정밀도를 어떻게 혁신적으로 향상시켰는지 학술 논리로 강조하십시오.
         """ 
 
-    # 폴백 결과물 생성용 임시 변수
     final_output = ""
 
-    if not API_KEYS["GEMINI_API"]: 
-        if str(page_type) in ["1", "page1"]: 
-            ks_status = "적합" if (5.0 <= temp <= 35.0 and hum < 80) else "주의 필요" 
-            final_output = (
-                f"{loc} 신축 벽면의 고해상도 이미지 비전 스캔 결과, 균열 및 표면 박리 취약 구역을 실시간 탐지하여 최적의 타격점을 배치하였습니다. "
-                f"시험 당일 대기 온도({temp}℃) 및 상대습도({hum}%) 환경은 KS F 2730 표준 기후 기준에 대비하여 '{ks_status}' 상태에 해당함을 판정하였으며, "
-                f"지정 타격점 간의 실제 이격 거리 제약인 30mm(3.0cm)를 검증 적용하여 수집 데이터의 신뢰성과 안전 구역 우회성을 확보하였습니다. "
-                f"\n\n*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
-            )
-        else: 
-            pct_attained = (est_strength / fck) * 100.0 if fck > 0 else 0 
-            status_msg = "우수한 수준의 안전 마진을 발현하고 있습니다" if est_strength >= fck else "설계 기준을 일부 만족하지 못하여 정기적 모니터링 추적이 요구됩니다" 
-            final_output = (
-                f"{loc} 콘크리트 구조물의 비파괴 정밀 진단 결과, 이상치 {ex_count}개를 소거한 보정 반발도 {r_val:.1f} R과 설계 슬럼프({slump}mm) 보정률이 통합 적용되었습니다. "
-                f"확보된 재령일수 {age}일의 시간 경화 진행 상태에 따라 최종 산출된 융합 예측 강도는 {est_strength:.1f} MPa로 산출되었습니다. "
-                f"이는 원 설계강도 {fck} MPa 대비 {pct_attained:.1f}% 수치에 해당하는 결과로서 공학적으로 {status_msg}. "
-                f"특히 초음파 속도 변수({v_upv:.1f} m/s)의 결합을 통해 표면 건조 상태뿐만 아니라 부재 내부 골재의 조밀도까지 보정하여 진단 신뢰도를 혁신하였습니다. "
-                f"\n\n*(수동/서버 API 키 미완료 상태로 내장 지능형 임시 분석 리포트가 출력되었습니다)*"
-            )
-    else:
-        try:
-            groq_key = st.secrets["GROQ_API_KEY"]
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {groq_key}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "model": "llama-3.1-8b-instant",
-                "messages": [
-                    {
-                        "role": "system", 
-                        "content": "당신은 건축구조물 안전진단 및 콘크리트 품질검사 전문가입니다. 주어지는 데이터를 한국어로 건설 시방서 양식에 맞게 전문적이고 간결하게 분석해 주세요."
-                    },
-                    {"role": "user", "content": prompt} 
-                ],
-                "temperature": 0.3
-            }
+    try:
+        groq_key = st.secrets["GROQ_API_KEY"]
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "당신은 건축구조물 안전진단 및 콘크리트 품질검사 전문가입니다. 주어지는 데이터를 한국어로 건설 시방서 양식에 맞게 전문적이고 간결하게 분석해 주세요."
+                },
+                {"role": "user", "content": prompt} 
+            ],
+            "temperature": 0.2
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            ai_text = result["choices"][0]["message"]["content"]
+            final_output = ai_text.strip() + "\n\n*(Groq Llama-3.1 Real-time AI 실시간 전문가 종합 분석 완료)*"
+        else:
+            final_output = f"🚨 Groq API 오류 발생 (코드: {response.status_code})\n\n💡 팁: Streamlit Secrets에 GROQ_API_KEY가 올바르게 등록되었는지 확인해 주세요!"
             
-            response = requests.post(url, headers=headers, json=data, timeout=10)
-            
-            if response.status_code == 200:
-                result = response.json()
-                ai_text = result["choices"][0]["message"]["content"]
-                final_output = ai_text.strip() + "\n\n*(Groq Llama-3.1 Real-time AI 실시간 전문가 종합 분석 완료)*"
-            else:
-                final_output = f"🚨 Groq API 오류 발생 (코드: {response.status_code})\n\n💡 팁: Streamlit Secrets에 GROQ_API_KEY가 올바르게 등록되었는지 확인해 주세요!"
-                
-        except KeyError:
-            final_output = "🚨 에러: Streamlit Secrets에 'GROQ_API_KEY' 이름이 정확하게 등록되지 않았습니다."
-        except Exception as e:
-            final_output = f"🚨 통신 에러 발생: {str(e)}"
+    except KeyError:
+        final_output = "🚨 에러: Streamlit Secrets에 'GROQ_API_KEY' 이름이 정확하게 등록되지 않았습니다."
+    except Exception as e:
+        final_output = f"🚨 통신 에러 발생: {str(e)}"
 
-    # 💡 [버그 수정 2] 다운로드 시 휘발되는 현상 방지를 위해 결과물을 Session State에 자동 박제!
+    # 💡 [보관소 영구 박제] 새로고침 시 데이터 휘발 방지용 핵심 연동 코드
     if str(page_type) in ["1", "page1"]:
         st.session_state["page1_ai_comment"] = final_output
     else:
         st.session_state["page2_ai_comment"] = final_output
 
     return final_output
-def reliability_pct_calc(est, fck):
-    if fck == 0: return 0.0
-    return (est / fck) * 100.0
-
-def calculate_angle_correction(r_val, angle):
-    if angle == 0: return 0.0
-    if r_val <= 30: max_up, max_down = 3.2, -4.1
-    elif r_val <= 40: max_up, max_down = 2.8, -4.8
-    else: max_up, max_down = 2.2, -5.2
-    rad = math.radians(angle)
-    return max_up * math.sin(rad) if angle > 0 else max_down * abs(math.sin(rad))
-
-def make_time_options_korean():
-    return [f"{h:02d}시 {m:02d}분" for h in range(24) for m in [0, 30]]
-
-def parse_korean_time(time_text):
-    return int(time_text.split("시")[0]), int(time_text.split("시")[1].replace("분", "").strip())
-
-#Groq 코드?
-def ask_groq_ai(prompt_text):
-    """
-    Streamlit Secrets에 등록된 GROQ_API_KEY를 사용하여
-    Llama 3.1 모델로부터 전문가 소견을 받아오는 함수
-    """
-    try:
-        # Secrets에서 키 가져오기 (만약 Secrets에 이름을 다르게 적으셨다면 그 이름으로 바꿔주세요)
-        groq_key = st.secrets["GROQ_API_KEY"]
-        
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {groq_key}",
-            "Content-Type": "application/json"
-        }
-        
-        data = {
-            "model": "llama-3.1-8b-instant",  # 속도가 빠르고 성능이 좋은 무료 모델
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": "당신은 건축구조물 안전진단 및 콘크리트 품질검사 전문가입니다. 주어지는 데이터를 한국어로 건설 시방서 양식에 맞게 전문적이고 간결하게 분석해 주세요."
-                },
-                {"role": "user", "content": prompt_text}
-            ],
-            "temperature": 0.3
-        }
-        
-        # API 호출
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
-        else:
-            return f"Groq API 오류 발생 (코드: {response.status_code})"
-            
-    except KeyError:
-        return "에러: Streamlit Secrets에 'GROQ_API_KEY'가 등록되지 않았습니다."
-    except Exception as e:
-        return f"Groq 통신 에러 발생: {str(e)}"
-
 # =========================================================================
 # ⚙ 사이드바 메인 탭 제어 (누락 복구 구역)
 # =========================================================================
@@ -838,14 +765,24 @@ elif "2." in main_menu:
 
         # 4. 강도 결과 요약
         story2.append(Paragraph("▶ 데이터 분석 및 최종 복합 예상 강도", styles2['K_Sub']))
+        
+        # 엑셀 데이터에 있는 Model B와 Model C를 표(Table)에 추가했습니다.
         res_data = [
             [Paragraph("반발도 데이터 전처리", styles2['K_Norm']), Paragraph(f"전체 평균: {total_avg:.2f} R / 이상치 {ex_count}개 폐기", styles2['K_Norm'])],
             [Paragraph("최종 보정 반발도", styles2['K_Norm']), Paragraph(f"{corrected_R:.2f} R (타격 각도 및 규격 보정 완료)", styles2['K_Norm'])],
             [Paragraph("단일 예상 강도 (Model A)", styles2['K_Norm']), Paragraph(f"{fc_rebound:.1f} MPa", styles2['K_Norm'])],
+            [Paragraph("슬럼프/재령 반영 강도 (Model B)", styles2['K_Norm']), Paragraph(f"{fc_slump_only:.1f} MPa", styles2['K_Norm'])],
+            [Paragraph("초음파 융합 강도 (Model C)", styles2['K_Norm']), Paragraph(f"{fc_ultra_only:.1f} MPa", styles2['K_Norm'])],
             [Paragraph("최종 융합 예상 강도 (Model D)", styles2['K_Norm']), Paragraph(f"{fc_final_hybrid:.1f} MPa", styles2['K_Norm'])]
         ]
-        t_res2 = Table(res_data, colWidths=[150, 370])
-        t_res2.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), pdf_font), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue)]))
+        
+        # 모델명이 길어져 글자가 깨지는 것을 막기 위해 왼쪽 칸 너비를 150 -> 180으로 넓혔습니다. (총합 520 유지)
+        t_res2 = Table(res_data, colWidths=[180, 340])
+        t_res2.setStyle(TableStyle([
+            ('FONTNAME', (0,0), (-1,-1), pdf_font), 
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey), 
+            ('BACKGROUND', (0,-1), (-1,-1), colors.lightsteelblue) # 표의 맨 마지막 행(Model D)에 하이라이트 배경색 적용
+        ]))
         story2.extend([t_res2, Spacer(1, 10)])
 
         # 👇 AI 소견 추가 (줄바꿈 <br/> 처리 적용)

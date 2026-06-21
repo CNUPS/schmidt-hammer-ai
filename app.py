@@ -553,17 +553,57 @@ elif "2." in main_menu:
         fck = st.number_input("설계기준강도 (MPa)", value=24.0)
         st.info(f"재령: {total_days}일 확보 (타설일: {m2_cast})")
         
-        st.subheader("🔊 2. 초음파 전파속도(UPV) 센서 연동")
-        use_ultra = st.checkbox("🟢 초음파 측정치 연동 (SCI 논문 복합법 적용)", value=True)
+        st.subheader("🔊 2. 초음파 다중 측정 및 정밀 융합 (SonReb)")
+        use_ultra = st.checkbox("🟢 초음파 측정치 연동 (다중 측정 및 이상치 보정)", value=True)
+        
+        v_mps = 0.0         # 전체 평균 속도
+        v_mps_corr = 0.0    # 10% 이상치 제외 보정 평균 속도
+        
         if use_ultra:
-            c_u1, c_u2 = st.columns(2)
-            with c_u1: dist_val = st.number_input("📏 프로브 거리(mm)", value=300.0)
-            with c_u2: time_val = st.number_input("⏱ 초음파 주행 시간(μs)", value=80.0)
+            upv_cols1, upv_cols2 = st.columns(2)
+            with upv_cols1:
+                upv_count_sel = st.selectbox("초음파 측정 횟수", ["1회", "3회", "5회", "7회", "10회", "기타(직접입력)"])
+                if upv_count_sel == "기타(직접입력)":
+                    upv_count = st.number_input("측정 횟수 직접 입력", min_value=1, max_value=50, value=5, step=1)
+                else:
+                    upv_count = int(upv_count_sel.replace("회", ""))
+                    
+            with upv_cols2:
+                upv_method = st.radio("전체 초음파 측정 방법", ["직접법", "간접법"], horizontal=True)
+                # 간접법은 직접법 대비 에너지가 약해 속도가 느리므로 보정계수(1.05배) 적용
+                method_factor = 1.0 if upv_method == "직접법" else 1.05 
+            
+            st.markdown("##### 📝 초음파 측정 데이터 입력")
+            upv_velocities = []
+            for i in range(upv_count):
+                c1, c2, c3 = st.columns([1, 2, 2])
+                c1.markdown(f"**#{i+1}**")
+                dist = c2.number_input(f"거리(mm) #{i+1}", min_value=10.0, value=300.0, step=10.0, key=f"u_dist_{i}", label_visibility="collapsed")
+                time_us = c3.number_input(f"시간(μs) #{i+1}", min_value=1.0, value=80.0, step=1.0, key=f"u_time_{i}", label_visibility="collapsed")
+                
+                # 속도(m/s) = (거리 / 시간) * 1000 * 측정법 보정계수
+                vel = (dist / time_us) * 1000 * method_factor if time_us > 0 else 0
+                upv_velocities.append(vel)
+                
+            if upv_velocities:
+                v_mps = sum(upv_velocities) / len(upv_velocities)
+                # 상하위 10% 제외 보정 로직 (데이터가 3개 이상일 때)
+                if len(upv_velocities) >= 3:
+                    sorted_v = sorted(upv_velocities)
+                    exclude_cnt = max(1, int(len(upv_velocities) * 0.1))
+                    if len(sorted_v) > exclude_cnt * 2:
+                        corr_v_list = sorted_v[exclude_cnt:-exclude_cnt]
+                        v_mps_corr = sum(corr_v_list) / len(corr_v_list)
+                    else:
+                        v_mps_corr = v_mps
+                else:
+                    v_mps_corr = v_mps
+                st.success(f"✅ 평균 초음파 속도: **{v_mps:.1f} m/s** (10% 이상치 보정: **{v_mps_corr:.1f} m/s**)")
         else:
-            dist_val, time_val = 0.0, 0.0
+            v_mps, v_mps_corr = 0.0, 0.0
 
         use_slump = st.checkbox("🟢 슬럼프 수치 연동 (미세 공극률 보정)", value=True)
-        val_slump = st.number_input("설계 슬럼프 (mm)", value=160.0) if use_slump else 0
+        val_slump = st.number_input("설계 슬럼프 (mm)", value=160.0) if use_slump else 150.0
 
     with col_data:
         st.subheader("🔨 3. 반발도(R값) 타격 데이터 세팅")
@@ -609,21 +649,20 @@ elif "2." in main_menu:
     env_factor = 1.06 if auto_hum2 >= 80.0 else 0.93 if (auto_temp2 < 5.0 or auto_temp2 > 35.0) else 1.0
     slump_corr = max(0.80, 1.0 - 0.0008 * (val_slump - 150)) if (use_slump and val_slump > 150) else 1.0
 
-    # 초음파 속도
-    if use_ultra:
-        v_mps = (dist_val / 1000.0) / (time_val / 1000000.0) if time_val > 0 else 0
-        v_kmps = v_mps / 1000.0
-    else: v_kmps, v_mps = 0, 0
+    # Model C: 초음파 단독 추정 강도
+    if use_ultra and v_mps_corr > 0:
+        fc_ultra_only = max(0.0, 0.015 * v_mps_corr - 36.0)
+    else:
+        fc_ultra_only = 0.0
 
-    # Model C (초음파) / Model D (최종 복합 - SCI 논문 SonReb 기반)
-    if use_ultra and v_kmps > 0:
-        base_hybrid = 0.05 * (corrected_R ** 1.2) * (v_kmps ** 1.5)
-        fc_ultra_only = base_hybrid * age_factor
+    # Model D: 최종 복합 (SCI 논문 SonReb 기반)
+    if use_ultra and v_mps_corr > 0:
+        v_kmps_corr = v_mps_corr / 1000.0
+        base_hybrid = 0.05 * (corrected_R ** 1.2) * (v_kmps_corr ** 1.5)
     else:
         base_hybrid = fc_rebound
-        fc_ultra_only = 0
 
-    fc_slump_only = fc_rebound * age_factor * slump_corr if use_slump else 0
+    fc_slump_only = fc_rebound * age_factor * slump_corr if use_slump else fc_rebound
     fc_final_hybrid = base_hybrid * env_factor * age_factor * slump_corr
 
     st.write("---")
@@ -631,9 +670,9 @@ elif "2." in main_menu:
     st.markdown(f"전체 평균 반발도: **{total_avg:.2f} R** ➔ 이상치 **{ex_count}개** 제외 ➔ **보정 평균 반발도: `{corrected_R:.2f} R`** (각도보정치 포함)")
 
     col_fc1, col_fc2, col_fc3 = st.columns(3)
-    col_fc1.info(f"**[Model A] 보정 반발도 기반 예상강도:**\n### {fc_rebound:.1f} MPa")
-    col_fc2.info(f"**[Model C] 초음파 기반 예상강도:**\n### {fc_ultra_only:.1f} MPa" if use_ultra else "**[Model C] 미연동**")
-    col_fc3.success(f"**🏆 [Model D] 복합 예상 강도:**\n### {fc_final_hybrid:.1f} MPa")
+    col_fc1.info(f"**[Model A] 단일 반발도 예상강도:**\n### {fc_rebound:.1f} MPa")
+    col_fc2.info(f"**[Model C] 초음파(10%보정) 강도:**\n### {fc_ultra_only:.1f} MPa" if use_ultra else "**[Model C] 초음파 미연동**")
+    col_fc3.success(f"**🏆 [Model D] 통합 복합 예상강도:**\n### {fc_final_hybrid:.1f} MPa")
 
     st.subheader("📝 자체 빅데이터 학습 AI 종합 요약 (사건 2 다차원 분석)")
     

@@ -256,13 +256,13 @@ def generate_gemini_commentary(page_type, data_dict):
         # 3. Llama 3.1 무료 고성능 모델 설정 및 프롬프트 주입
         # (💡 중요: prompt 대신 기존 코드의 prompt_text 변수를 매핑했습니다)
         data = {
-            "model": "llama-3.1-8b-instant",  # 100% 무료 고성능 모델
+            "model": "llama-3.1-8b-instant",
             "messages": [
                 {
                     "role": "system", 
                     "content": "당신은 건축구조물 안전진단 및 콘크리트 품질검사 전문가입니다. 주어지는 데이터를 한국어로 건설 시방서 양식에 맞게 전문적이고 간결하게 분석해 주세요."
                 },
-                {"role": "user", "content": prompt_text} 
+                {"role": "user", "content": prompt}  # 👈 prompt_text 를 그냥 prompt 로 바꿔주세요!
             ],
             "temperature": 0.3
         }
@@ -300,7 +300,6 @@ def make_time_options_korean():
 
 def parse_korean_time(time_text):
     return int(time_text.split("시")[0]), int(time_text.split("시")[1].replace("분", "").strip())
-
 
 #Groq 코드?
 def ask_groq_ai(prompt_text):

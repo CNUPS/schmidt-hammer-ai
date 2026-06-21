@@ -831,50 +831,50 @@ elif "2." in main_menu:
             buffer_p2.seek(0)
             return buffer_p2.getvalue()
 
-        st.write("---")
-    
-    # 엑셀/PDF 파일명 커스텀 지정 UI 추가
-    st.markdown("#### 💾 분석 결과 다운로드")
-    custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
-    excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
-    pdf_filename = custom_filename + ".pdf" if not custom_filename.endswith(".pdf") else custom_filename
+st.write("---")
+        
+        # 엑셀/PDF 파일명 커스텀 지정 UI 추가
+        st.markdown("#### 💾 분석 결과 다운로드")
+        custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
+        excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
+        pdf_filename = custom_filename + ".pdf" if not custom_filename.endswith(".pdf") else custom_filename
 
-    col_dl1, col_dl2 = st.columns(2)
-    
-    with col_dl1:
-        st.download_button(
-            label="📥 [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
-            data=build_page2_pdf(),
-            file_name=pdf_filename,
-            mime="application/pdf",
-            use_container_width=True
-        )
+        col_dl1, col_dl2 = st.columns(2)
+        
+        with col_dl1:
+            st.download_button(
+                label="📥 [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
+                data=build_page2_pdf(),
+                file_name=pdf_filename,
+                mime="application/pdf",
+                use_container_width=True
+            )
 
-    with col_dl2:
-        # [중요] engine='openpyxl' 지정으로 엑셀 깨짐 완벽 방지 및 시트 추가
-        buffer_xls = io.BytesIO()
-        with pd.ExcelWriter(buffer_xls, engine='openpyxl') as writer:
-            # 👇 엑셀에서도 이전 변수를 삭제하고 다중 측정 평균/보정 속도를 삽입합니다.
-            pd.DataFrame({"항목": ["수행 일시", "기온 (℃)", "상대습도 (%)", "설계기준강도", "초음파 평균속도 (m/s)", "초음파 보정속도 (m/s)"], "내용": [f"{m2_date} ({selected_time2})", auto_temp2, auto_hum2, fck, v_mps, v_mps_corr]}).to_excel(writer, sheet_name="측정조건", index=False)
-            pd.DataFrame({"타격_순서": [f"#{i:02d}" for i in range(1, strike_count + 1)], "실측_반발도(R)": raw_inputs}).to_excel(writer, sheet_name=f"{strike_count}회_타격데이터", index=False)
-            pd.DataFrame({"연산_모델_분류": ["[Model A] 단일 반발도 강도", "[Model B] 슬럼프/재령 반영", "[Model C] 초음파 융합 강도", "[Model D] 최종 융합 복합 강도"], "추정_압축강도(MPa)": [round(fc_rebound, 1), round(fc_slump_only, 1), round(fc_ultra_only, 1), round(fc_final_hybrid, 1)]}).to_excel(writer, sheet_name="강도결과", index=False)
-            
-            ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견 없음")
-            pd.DataFrame({"AI 소견": [ai_comment_str]}).to_excel(writer, sheet_name="AI_종합소견", index=False)
-            
-            pd.DataFrame({"산출 근거 및 문헌": [
-                "1. [KS F 2730] 반발경도 시험방법 표준 규격 (이상치 폐기 및 각도 보정)",
-                "2. [수식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
-                "3. [수식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수",
-                "4. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",
-                "5. [국내 논문] 김철수 외, 한국건축구조학회논문집 (2021.05)",
-                "6. [시방서] KCS 14 20 00 콘크리트 표준시방서"
-            ]}).to_excel(writer, sheet_name="참조근거", index=False)
-            
-        st.download_button(
-            label="📊 전체 도출 데이터 종합 (Excel)",
-            data=buffer_xls.getvalue(),
-            file_name=excel_filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        with col_dl2:
+            # [중요] engine='openpyxl' 지정으로 엑셀 깨짐 완벽 방지 및 시트 추가
+            buffer_xls = io.BytesIO()
+            with pd.ExcelWriter(buffer_xls, engine='openpyxl') as writer:
+                # 👇 엑셀에서도 이전 변수를 삭제하고 다중 측정 평균/보정 속도를 삽입합니다.
+                pd.DataFrame({"항목": ["수행 일시", "기온 (℃)", "상대습도 (%)", "설계기준강도", "초음파 평균속도 (m/s)", "초음파 보정속도 (m/s)"], "내용": [f"{m2_date} ({selected_time2})", auto_temp2, auto_hum2, fck, v_mps, v_mps_corr]}).to_excel(writer, sheet_name="측정조건", index=False)
+                pd.DataFrame({"타격_순서": [f"#{i:02d}" for i in range(1, strike_count + 1)], "실측_반발도(R)": raw_inputs}).to_excel(writer, sheet_name=f"{strike_count}회_타격데이터", index=False)
+                pd.DataFrame({"연산_모델_분류": ["[Model A] 단일 반발도 강도", "[Model B] 슬럼프/재령 반영", "[Model C] 초음파 융합 강도", "[Model D] 최종 융합 복합 강도"], "추정_압축강도(MPa)": [round(fc_rebound, 1), round(fc_slump_only, 1), round(fc_ultra_only, 1), round(fc_final_hybrid, 1)]}).to_excel(writer, sheet_name="강도결과", index=False)
+                
+                ai_comment_str = st.session_state.get("page2_ai_comment", "생성된 AI 소견 없음")
+                pd.DataFrame({"AI 소견": [ai_comment_str]}).to_excel(writer, sheet_name="AI_종합소견", index=False)
+                
+                pd.DataFrame({"산출 근거 및 문헌": [
+                    "1. [KS F 2730] 반발경도 시험방법 표준 규격 (이상치 폐기 및 각도 보정)",
+                    "2. [수식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
+                    "3. [수식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 보정계수",
+                    "4. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",
+                    "5. [국내 논문] 김철수 외, 한국건축구조학회논문집 (2021.05)",
+                    "6. [시방서] KCS 14 20 00 콘크리트 표준시방서"
+                ]}).to_excel(writer, sheet_name="참조근거", index=False)
+                
+            st.download_button(
+                label="📊 전체 도출 데이터 종합 (Excel)",
+                data=buffer_xls.getvalue(),
+                file_name=excel_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )

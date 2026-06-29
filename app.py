@@ -456,30 +456,50 @@ if "1." in main_menu:
         overlay[:] = [0, 0, 230]
 
         all_candidates = []
+        # [추가된 핵심 AI 알고리즘] 
+        # safe_area(안전영역)를 분석하여 '가장자리나 결함으로부터 얼마나 먼지(안전한지)' 깊이 지도를 만듭니다.
+        safe_area_uint8 = np.uint8(safe_area)
+        # 0 초과값은 모두 255(흰색)로 만들어 확실한 마스크 생성
+        _, binary_safe = cv2.threshold(safe_area_uint8, 0, 255, cv2.THRESH_BINARY) 
+        # 거리 변환 (넓은 면적의 중심일수록 큰 값을 가짐)
+        dist_transform = cv2.distanceTransform(binary_safe, cv2.DIST_L2, 5)
+
         for y in range(margin, h - margin, 6):
             for x in range(margin, w - margin, 6):
                 if safe_area[y, x] > 0:
                     overlay[y:y+6, x:x+6] = [0, 220, 0]
-                    all_candidates.append({"x": x, "y": y})
+                    # x, y 좌표뿐만 아니라, 이 픽셀의 '안전 면적 크기(깊이)'를 함께 저장합니다.
+                    all_candidates.append({
+                        "x": x, 
+                        "y": y, 
+                        "depth": dist_transform[y, x]
+                    })
 
         # 픽셀을 변환하여 실제 물리적 3cm(30mm) 이상 거리 이격 조건 확인
         min_distance_mm = 30.0 
         min_distance_px = min_distance_mm / mm_per_pixel if mm_per_pixel > 0 else 50
         
+        # [핵심 로직 변경] 면적이 가장 넓은 곳(depth가 큰 곳)부터 우선순위로 내림차순 정렬!
+        # 이제 왼쪽 위가 아니라, 화면에서 가장 깨끗하고 넓은 곳부터 1순위로 탐색합니다.
+        all_candidates.sort(key=lambda item: item["depth"], reverse=True)
+
         final_selected_pts = []
-        step_size = max(1, len(all_candidates) // (recommended_strikes * 4))
         
-        for pt in all_candidates[::step_size]:
+        # 정렬된 '가장 좋은 후보'부터 차례대로 꺼내며 3cm 이격을 검사합니다.
+        for pt in all_candidates:
             is_valid = True
             for f_pt in final_selected_pts:
+                # 피타고라스 정리로 기존에 찍힌 점들과의 거리 검산
                 dist_px = math.sqrt((pt["x"] - f_pt["x"])**2 + (pt["y"] - f_pt["y"])**2)
                 if dist_px < min_distance_px:
                     is_valid = False
                     break
             
+            # 모든 기존 점들과 3cm 이상 떨어져 있다면 확정 및 번호 부여
             if is_valid:
                 final_selected_pts.append(pt)
             
+            # 추천 타격점 개수(예: 20개)를 모두 채우면 즉시 중단
             if len(final_selected_pts) == recommended_strikes:
                 break
 

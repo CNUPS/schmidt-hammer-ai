@@ -751,8 +751,10 @@ elif "2." in main_menu:
         fc_ultra_only = 0.0
 
     if use_ultra and v_mps_corr > 0:
-        v_kmps_corr = v_mps_corr / 1000.0
-        base_hybrid = 0.05 * (corrected_R ** 1.2) * (v_kmps_corr ** 1.5)
+        v_kmps_corr = v_mps_corr / 1000.0  # m/s -> km/s 단위 환산
+        # 일본건축학회기법: Fc = 8.2*R + 269*V - 1049 (kgf/cm² 단위) -> MPa 변환(/10)
+        fc_aij_kgf = 8.2 * corrected_R + 269 * v_kmps_corr - 1049
+        base_hybrid = max(0.0, fc_aij_kgf / 10.0)  # 음수 방지 및 MPa 환산
     else:
         base_hybrid = fc_rebound
 
@@ -880,7 +882,7 @@ elif "2." in main_menu:
 
         story2.append(Paragraph("[2] 강도 융합(SonReb) 알고리즘", styles2['K_Norm']))
         story2.append(Paragraph("- 단일 반발도 추정식: Fc = 1.3 × R - 14.0 (MPa)", styles2['K_Norm']))
-        story2.append(Paragraph("- 다차원 복합 강도식: Fc = 0.05 × R^1.2 × V^1.5 × 보정계수 (MPa)", styles2['K_Norm']))
+        story2.append(Paragraph("- 다차원 복합 강도식(일본건축학회): Fc = (8.2 × R + 269 × V - 1049) / 10 (MPa, V: km/s)", styles2['K_Norm']))
         story2.append(Spacer(1, 5))
         
         story2.append(Paragraph("[3] KS 표준 및 국내외 참조 문헌", styles2['K_Norm']))
@@ -931,7 +933,7 @@ elif "2." in main_menu:
                 "1. [측정식] 초음파 직접법(m/s) = (거리/시간)*1000",
                 "2. [측정식] 초음파 간접법(m/s) = (거리/시간)*1000 * 1.05 (에너지 감쇠 5% 보상)",
                 "3. [산출식] 단일 예상 강도식: Fc = 1.3 * R - 14.0",
-                "4. [산출식] 다중 복합 강도식(SonReb): Fc = 0.05 * R^1.2 * V^1.5 * 환경보정계수",
+                "4. [산출식] 다중 복합 강도식(일본건축학회): Fc = (8.2 * R + 269 * V - 1049) / 10 (MPa, V: km/s)",
                 "5. [KS 규격] KS F 2730 (반발경도 이상치 폐기 및 중력보정), KS F 2731 (초음파 시험법)",
                 "6. [시방서] KCS 14 20 00 국토교통부 콘크리트 표준시방서",
                 "7. [SCI 논문] A. Samarin et al., ACI Materials Journal (1983.11)",

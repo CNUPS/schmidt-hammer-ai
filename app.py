@@ -116,7 +116,7 @@ except Exception:
 
 # 만약 Secrets 설정을 안했거나 수동 입력을 원할 경우를 위해 사이드바 하단에 안전 비밀 입력 가이드 제공
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔑 수동 API 키 덮어쓰기 (선택)")
+st.sidebar.subheader(" 수동 API 키 덮어쓰기 (선택)")
 manual_gemini = st.sidebar.text_input("Gemini API Key 수동 등록", value="", type="password", help="Streamlit Secrets 환경을 설정하지 않은 경우 여기에 직접 키를 입력하셔도 정상 연동됩니다.")
 
 if manual_gemini:
@@ -149,9 +149,9 @@ def calculate_pixel_scale(p1_x, p1_y, p2_x, p2_y, real_length_mm):
     return real_length_mm / pixel_dist, pixel_dist
 
 def evaluate_ks_weather(temp, hum):
-    if temp < 5.0 or temp > 35.0 or hum >= 80.0:
-        return False, "❌ [부적합] 온도가 5~35℃를 벗어나거나 습도가 80% 이상입니다. (KS F 2730 시방 기준 위반 주의)"
-    return True, "✅ [적합] 온도와 습도가 허용 범위 내에 있어 측정 신뢰성이 높습니다. (KS F 2730 표준 부합)"
+    if temp <0 or hum >= 95.0:
+        return False, " [부적합] 온도가 0℃ 이하이거나 습도가 95% 이상입니다. 실험 결과가 정상적이지 않을수 있습니다."
+    return True, " "
 
 def fetch_kma_weather_simulated(date_val, hour, minute, loc_str):
     if not loc_str: loc_str = "서울"
@@ -315,12 +315,12 @@ def generate_gemini_commentary(page_type, data_dict):
             ai_text = result["choices"][0]["message"]["content"]
             final_output = ai_text.strip() + "\n\n*(Groq Llama-3.1 Real-time AI 실시간 전문가 종합 분석 완료)*"
         else:
-            final_output = f"🚨 Groq API 오류 발생 (코드: {response.status_code})\n\n💡 팁: Streamlit Secrets에 GROQ_API_KEY가 올바르게 등록되었는지 확인해 주세요!"
+            final_output = f" Groq API 오류 발생 (코드: {response.status_code})\n\n 팁: Streamlit Secrets에 GROQ_API_KEY가 올바르게 등록되었는지 확인해 주세요!"
             
     except KeyError:
-        final_output = "🚨 에러: Streamlit Secrets에 'GROQ_API_KEY' 이름이 정확하게 등록되지 않았습니다."
+        final_output = " 에러: Streamlit Secrets에 'GROQ_API_KEY' 이름이 정확하게 등록되지 않았습니다."
     except Exception as e:
-        final_output = f"🚨 통신 에러 발생: {str(e)}"
+        final_output = f" 통신 에러 발생: {str(e)}"
 
     # 💡 [보관소 영구 박제] 새로고침 시 데이터 휘발 방지용 핵심 연동 코드
     if str(page_type) in ["1", "page1"]:
@@ -340,9 +340,9 @@ main_menu = st.sidebar.radio("작업 선택", ["1. 슈미트해머 측정 신뢰
 # 1페이지: AI 표면 신뢰도 스캔
 # =========================================================================
 if "1." in main_menu:
-    st.title("🎯 스마트 슈미트해머 1단계: AI 표면 검사보고서")
+    st.title(" 스마트 슈미트해머 1단계: AI 표면 검사보고서")
     
-    st.subheader("📋 현장 기본 정보 입력")
+    st.subheader(" 현장 기본 정보 입력")
     c_hdr1, c_hdr2, c_hdr3, c_hdr4 = st.columns(4)
     with c_hdr1: 
         m_date = st.date_input("측정 실시 날짜", datetime.date.today())
@@ -353,21 +353,18 @@ if "1." in main_menu:
         m_hour, m_min = parse_korean_time(selected_time)
     with c_hdr3: m_loc = st.text_input("측정 위치", value="서울시 마포구 신축 현장")
     with c_hdr4: 
-        # 타격 횟수 추천 로직 (+알파)
-        base_strikes = st.selectbox("기본 타격 횟수 선택", [5, 10, 15, 20, 25, 30], index=2)
-        extra_map = {5: 3, 10: 5, 15: 5, 20: 5, 25: 5, 30: 5}
-        extra_strikes = extra_map[base_strikes]
-        recommended_strikes = base_strikes + extra_strikes
+        base_strikes = st.selectbox("타격 횟수 선택", [5, 10, 15, 20, 25, 30], index=2)
+        recommended_strikes = base_strikes
 
-    st.info(f"💡 **AI 스마트 추천**: 결함에 대비한 예비 타격점 확보를 위해 기본 {base_strikes}회에 추가 {extra_strikes}회를 더하여 **총 {recommended_strikes}회**의 최적 타격점을 추출합니다.")
+    st.info(f" **AI 스마트 추천**: 선택하신 기본 **총 {recommended_strikes}회**의 최적 타격점을 추출합니다.")
 
     auto_temp, auto_hum = fetch_kma_weather_simulated(m_date, m_hour, m_min, m_loc)
     is_weather_valid, weather_msg = evaluate_ks_weather(auto_temp, auto_hum)
-    st.info(f"📡 외부 API 기상 관측 ➔ 기온: {auto_temp} ℃ / 상대습도: {auto_hum} %")
+    st.info(f" 외부 API 기상 관측 ➔ 기온: {auto_temp} ℃ / 상대습도: {auto_hum} %")
     if is_weather_valid: st.success(weather_msg)
     else: st.error(weather_msg)
 
-    st.markdown("#### 🧠 차세대 결함 검출 AI 인프라 연동 현황")
+    st.markdown("####  차세대 결함 검출 AI 인프라 연동 현황")
     
     # AI 실제 연동 상태 표시
     is_roboflow_live = API_KEYS["ROBOFLOW_API"] == "wk4BcUKf1InnR2LjHPF8" or API_KEYS["ROBOFLOW_API"] != ""
@@ -377,30 +374,30 @@ if "1." in main_menu:
     c_status_rf, c_status_gm = st.columns(2)
     with c_status_rf:
         if is_roboflow_live:
-            st.success(f"🟢 **Roboflow Edge YOLO API 실시간 연동 완료** (Key: {API_KEYS['ROBOFLOW_API'][:4]}***)")
+            st.success(f" **Roboflow Edge YOLO API 실시간 연동 완료** (Key: {API_KEYS['ROBOFLOW_API'][:4]}***)")
         else:
-            st.error("❌ **Roboflow Vision API 오프라인**")
+            st.error(" **Roboflow Vision API 오프라인**")
     with c_status_gm:
         if is_gemini_live:
-            st.success("🟢 **Gemini AI LLM 전문가 소견 생성기 온라인 (실시간 API 가동 중)**")
+            st.success(" **Gemini AI LLM 전문가 소견 생성기 온라인 (실시간 API 가동 중)**")
         else:
-            st.warning("🟡 **Gemini AI API Key 미연동** (하단 수동 등록 혹은 클라우드 Secrets를 통해 키를 설정하면 100% 활성화됩니다)")
+            st.warning(" **Gemini AI API Key 미연동** (하단 수동 등록 혹은 클라우드 Secrets를 통해 키를 설정하면 100% 활성화됩니다)")
 
     c_api1, c_api2, c_api3 = st.columns(3) 
     use_model1 = c_api1.checkbox("Edge YOLO v8 (균열/철근노출 탐지)", value=True) 
-    c_api1.caption("🔗 API: universe.roboflow.com/defect-detection") 
+    c_api1.caption(" API: universe.roboflow.com/defect-detection") 
      
     use_model2 = c_api2.checkbox("Edge YOLO v9 (요철/불균질면 탐지)", value=True) 
-    c_api2.caption("🔗 API: universe.roboflow.com/shm") 
+    c_api2.caption(" API: universe.roboflow.com/shm") 
      
     use_model3 = c_api3.checkbox("Edge YOLO v10 (범용 결함 탐지)", value=True) 
-    c_api3.caption("🔗 API: universe.roboflow.com/concrete-defects") 
+    c_api3.caption(" API: universe.roboflow.com/concrete-defects") 
 
     # --- 👇 자체 AI 모델 체크박스 추가 ---
     st.write("")
     use_custom_model = st.checkbox("자체 학습된 AI 모델", value=True)
-    st.caption("🔗 사이트: https://app.roboflow.com/-ovfhd/concrete_defect-j9nuw/train")
-    uploaded_file = st.file_uploader("📸 벽면 촬영 정밀 비전 영상 업로드", type=["jpg", "jpeg", "png"])
+    st.caption(" 사이트: https://app.roboflow.com/-ovfhd/concrete_defect-j9nuw/train")
+    uploaded_file = st.file_uploader(" 벽면 촬영 정밀 비전 영상 업로드", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
         image = PILImage.open(uploaded_file).convert("RGB")
@@ -413,7 +410,7 @@ if "1." in main_menu:
             img_bgr = cv2.resize(img_bgr, (max_width, int(img_bgr.shape[0] * ratio)))
         h, w, _ = img_bgr.shape
 
-        st.markdown("##### 📏 스케일 팩터 검정 (픽셀-mm 캘리브레이션)")
+        st.markdown("#####  스케일 팩터 검정 (픽셀-mm 캘리브레이션)")
         c_pt1, c_pt2, c_len = st.columns(3)
         with c_pt1: p1_x, p1_y = st.number_input("기준점1 X", value=int(w*0.25)), st.number_input("기준점1 Y", value=int(h*0.80))
         with c_pt2: p2_x, p2_y = st.number_input("기준점2 X", value=int(w*0.75)), st.number_input("기준점2 Y", value=int(h*0.80))
@@ -548,8 +545,8 @@ if "1." in main_menu:
             ai_summary_txt = generate_gemini_commentary(1, page1_data)
             st.session_state["page1_ai_comment"] = ai_summary_txt
 
-        # [수정 완료] 헤더를 📊 하나로 깔끔하게 통일했습니다! (📝 헤더는 삭제됨)
-        st.subheader("📊 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
+        # [수정 완료] 헤더를  하나로 깔끔하게 통일했습니다! ( 헤더는 삭제됨)
+        st.subheader(" 자체 빅데이터 학습 AI 종합 요약 (사건 1 분석)")
         st.info(ai_summary_txt)
 
         def build_page1_pdf():
@@ -610,7 +607,7 @@ if "1." in main_menu:
 
         st.write("---")
         st.download_button(
-            label="📥 [1페이지] AI 표면 품질 검사보고서 PDF 다운로드",
+            label=" [1페이지] AI 표면 품질 검사보고서 PDF 다운로드",
             data=build_page1_pdf(),
             file_name=f"1_AI_Surface_Report_{m_date}.pdf",
             mime="application/pdf",
@@ -622,12 +619,12 @@ if "1." in main_menu:
 # 2페이지: 다중 센서 복합 강도 연산 시스템 (근거 강화)
 # =========================================================================
 elif "2." in main_menu:
-    st.title("📊 SCI급 다중 센서 및 환경 변수 복합 강도 연산 시스템")
+    st.title(" SCI급 다중 센서 및 환경 변수 복합 강도 연산 시스템")
 
     col_env, col_data = st.columns([1, 1])
 
     with col_env:
-        st.subheader("📋 1. 현장 계측 정보 및 재령 입력")
+        st.subheader(" 1. 현장 계측 정보 및 재령 입력")
         m2_date = st.date_input("슈미트해머 실시 날짜", datetime.date.today())
         opts2 = make_time_options_korean()
         selected_time2 = st.selectbox("측정 시간", opts2, index=opts2.index("10시 00분"))
@@ -636,7 +633,7 @@ elif "2." in main_menu:
 
         auto_temp2, auto_hum2 = fetch_kma_weather_simulated(m2_date, m2_hour, m2_min, m2_loc)
         is_valid2, msg2 = evaluate_ks_weather(auto_temp2, auto_hum2)
-        st.warning(f"📡 기상청 기반 온/습도: 온도 {auto_temp2}℃ / 습도 {auto_hum2}%")
+        st.warning(f" 기상청 기반 온/습도: 온도 {auto_temp2}℃ / 습도 {auto_hum2}%")
         st.caption(f"※ 코멘트: 해당 환경은 {msg2}")
 
         m2_cast = st.date_input("타설일", datetime.date.today() - datetime.timedelta(days=90))
@@ -644,8 +641,8 @@ elif "2." in main_menu:
         fck = st.number_input("설계기준강도 (MPa)", value=24.0)
         st.info(f"재령: {total_days}일 확보 (타설일: {m2_cast})")
         
-        st.subheader("🔊 2. 초음파 다중 측정 및 정밀 융합 (SonReb)")
-        use_ultra = st.checkbox("🟢 초음파 측정치 연동 (다중 측정 및 이상치 보정)", value=True)
+        st.subheader(" 2. 초음파 다중 측정 및 정밀 융합 (SonReb)")
+        use_ultra = st.checkbox(" 초음파 측정치 연동 (다중 측정 및 이상치 보정)", value=True)
         
         v_mps = 0.0         # 전체 평균 속도
         v_mps_corr = 0.0    # 10% 이상치 제외 보정 평균 속도
@@ -666,7 +663,7 @@ elif "2." in main_menu:
                 upv_method = st.radio("전체 초음파 측정 방법", ["직접법", "간접법"], horizontal=True)
                 method_factor = 1.0 if upv_method == "직접법" else 1.05 
             
-            st.markdown("##### 📝 초음파 측정 데이터 입력")
+            st.markdown("#####  초음파 측정 데이터 입력")
             upv_velocities = []
             for i in range(upv_count):
                 c1, c2, c3 = st.columns([1, 2, 2])
@@ -699,21 +696,21 @@ elif "2." in main_menu:
                         v_mps_corr = v_mps
                 else:
                     v_mps_corr = v_mps
-                st.success(f"✅ 평균 초음파 속도: **{v_mps:.1f} m/s** (10% 이상치 보정: **{v_mps_corr:.1f} m/s**)")
+                st.success(f" 평균 초음파 속도: **{v_mps:.1f} m/s** (10% 이상치 보정: **{v_mps_corr:.1f} m/s**)")
         else:
             v_mps, v_mps_corr = 0.0, 0.0
 
-        use_slump = st.checkbox("🟢 슬럼프 수치 연동 (미세 공극률 보정)", value=True)
+        use_slump = st.checkbox(" 슬럼프 수치 연동 (미세 공극률 보정)", value=True)
         val_slump = st.number_input("설계 슬럼프 (mm)", value=160.0) if use_slump else 150.0
 
     with col_data:
-        st.subheader("🔨 3. 반발도(R값) 타격 데이터 세팅")
+        st.subheader(" 3. 반발도(R값) 타격 데이터 세팅")
         c_strk1, c_strk2 = st.columns(2)
         with c_strk1:
             strike_count = st.selectbox("기록할 타격 횟수", [10, 15, 20, 25, 30, 35], index=2) 
         with c_strk2:
             angle_opts = [f"{a}° (상향)" if a>0 else f"{a}° (하향)" if a<0 else f"{a}° (수평/벽면)" for a in range(90, -95, -5)]
-            selected_angle_str = st.selectbox("🎯 타격 각도", angle_opts, index=18)
+            selected_angle_str = st.selectbox(" 타격 각도", angle_opts, index=18)
             angle_val = int(selected_angle_str.split("°")[0])
 
         raw_inputs = []
@@ -762,13 +759,13 @@ elif "2." in main_menu:
     fc_final_hybrid = base_hybrid * env_factor * age_factor * slump_corr
 
     st.write("---")
-    st.markdown(f"### 📈 데이터 보정 결과")
+    st.markdown(f"###  데이터 보정 결과")
     st.markdown(f"전체 평균 반발도: **{total_avg:.2f} R** ➔ 이상치 **{ex_count}개** 제외 ➔ **보정 평균 반발도: `{corrected_R:.2f} R`** (각도보정치 포함)")
 
     col_fc1, col_fc2, col_fc3 = st.columns(3)
     col_fc1.info(f"**[Model A] 단일 반발도 예상강도:**\n### {fc_rebound:.1f} MPa")
-    col_fc2.info(f"**[Model C] 초음파(10%보정) 강도:**\n### {fc_ultra_only:.1f} MPa" if use_ultra else "**[Model C] 초음파 미연동**")
-    col_fc3.success(f"**🏆 [Model D] 통합 복합 예상강도:**\n### {fc_final_hybrid:.1f} MPa")
+    col_fc2.info(f"**[Model C] 초음파 강도:**\n### {fc_ultra_only:.1f} MPa" if use_ultra else "**[Model C] 초음파 미연동**")
+    col_fc3.success(f"** [Model D] 통합 복합 예상강도:**\n### {fc_final_hybrid:.1f} MPa")
 
     def build_page2_pdf():
         buffer_p2 = io.BytesIO()
@@ -897,8 +894,8 @@ elif "2." in main_menu:
 
     st.write("---")
     
-    st.markdown("#### 💾 분석 결과 다운로드")
-    custom_filename = st.text_input("📝 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
+    st.markdown("####  분석 결과 다운로드")
+    custom_filename = st.text_input(" 저장할 파일 이름을 입력하세요 (확장자 제외)", value=f"Multi_Sensor_Data_{m2_date}")
     excel_filename = custom_filename + ".xlsx" if not custom_filename.endswith(".xlsx") else custom_filename
     pdf_filename = custom_filename + ".pdf" if not custom_filename.endswith(".pdf") else custom_filename
 
@@ -906,7 +903,7 @@ elif "2." in main_menu:
     
     with col_dl1:
         st.download_button(
-            label="📥 [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
+            label=" [2페이지] 다중 센서 복합 강도 성적서 (PDF)",
             data=build_page2_pdf(),
             file_name=pdf_filename,
             mime="application/pdf",
@@ -941,7 +938,7 @@ elif "2." in main_menu:
             ]}).to_excel(writer, sheet_name="참조근거", index=False)
             
         st.download_button(
-            label="📊 전체 도출 데이터 종합 (Excel)",
+            label=" 전체 도출 데이터 종합 (Excel)",
             data=buffer_xls.getvalue(),
             file_name=excel_filename,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

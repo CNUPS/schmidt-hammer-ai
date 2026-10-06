@@ -533,10 +533,15 @@ if "1." in main_menu:
         } 
 
         # --- 👇 Secrets 키 자동 연동 로직 ---
-        if not st.session_state.get("gemini_key_input") and "GEMINI_API" in st.secrets:
-            API_KEYS["GEMINI_API"] = st.secrets["GEMINI_API"]
-            genai.configure(api_key=st.secrets["GEMINI_API"])
-        elif st.session_state.get("gemini_key_input"):
+        # --- 👇 Secrets 키 자동 연동 로직 (secrets.toml 미존재 시 예외 방지 처리) ---
+        try:
+            if not st.session_state.get("gemini_key_input") and "GEMINI_API" in st.secrets:
+                API_KEYS["GEMINI_API"] = st.secrets["GEMINI_API"]
+                genai.configure(api_key=st.secrets["GEMINI_API"])
+        except Exception:
+            pass
+
+        if st.session_state.get("gemini_key_input"):
             API_KEYS["GEMINI_API"] = st.session_state["gemini_key_input"]
             genai.configure(api_key=st.session_state["gemini_key_input"])
 
